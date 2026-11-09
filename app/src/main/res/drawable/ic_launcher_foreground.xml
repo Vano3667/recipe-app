@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original artwork: a cooking pot with steam (created for this project, CC0). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#C0796B"
+        android:pathData="M30,52h48v14c0,8.8 -7.2,16 -16,16h-16c-8.8,0 -16,-7.2 -16,-16z" />
+    <path android:fillColor="#A65F52" android:pathData="M27,48h54a3,3 0 0,1 0,6h-54a3,3 0 0,1 0,-6z" />
+    <path android:fillColor="#A65F52" android:pathData="M48,42h12a3,3 0 0,1 0,6h-12a3,3 0 0,1 0,-6z" />
+    <path android:strokeColor="#E8B9A5" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M44,36c-3,-4 3,-6 0,-10M54,36c-3,-4 3,-6 0,-10M64,36c-3,-4 3,-6 0,-10" />
+</vector>
