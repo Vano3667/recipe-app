@@ -53,6 +53,21 @@ class AppFlowsTest {
         }
     }
 
+    /**
+     * Waits until the element with [tag] is selected. A choice like the theme is first saved to the DB
+     * in the background and only then reaches the screen, so waitForIdle() alone doesn't guarantee it.
+     */
+    private fun waitSelected(tag: String, timeout: Long = 15_000) {
+        try {
+            rule.waitUntil(timeout) {
+                rule.onAllNodesWithTag(tag).fetchSemanticsNodes()
+                    .any { it.config.getOrNull(SemanticsProperties.Selected) == true }
+            }
+        } catch (e: Throwable) {
+            throw AssertionError("Элемент с тегом «$tag» не стал выбранным за $timeout мс", e)
+        }
+    }
+
     private fun go(dest: TopDestination) {
         waitTag("nav_${dest.name}")
         rule.onNodeWithTag("nav_${dest.name}").performClick()
@@ -73,7 +88,7 @@ class AppFlowsTest {
         waitTag("theme_DARK")
         try {
             rule.onNodeWithTag("theme_DARK").performClick()
-            rule.waitForIdle()
+            waitSelected("theme_DARK")
             rule.onNodeWithTag("theme_DARK").assertIsSelected()
             // Screen still renders and navigation works in dark mode.
             go(TopDestination.RECIPES)
@@ -82,6 +97,8 @@ class AppFlowsTest {
             go(TopDestination.SETTINGS)
             waitTag("theme_SYSTEM")
             rule.onNodeWithTag("theme_SYSTEM").performClick()
+            // Let the reset reach the DB before the activity closes; runCatching keeps the original failure visible.
+            runCatching { waitSelected("theme_SYSTEM") }
         }
     }
 

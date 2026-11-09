@@ -85,6 +85,14 @@ jobs:
           gradle-version: '8.7'
       - run: gradle wrapper --gradle-version 8.7
       - run: bash scripts/fetch_fonts.sh
+      # Build both APKs before the emulator starts and stop the Gradle/Kotlin daemons (-Xmx4g each):
+      # on the 2-core / 7 GB runner they compete with the emulator (4 GB) for memory,
+      # and the runner can be shut down in the middle of the tests.
+      - name: Build app and test APKs before the emulator starts
+        run: |
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
