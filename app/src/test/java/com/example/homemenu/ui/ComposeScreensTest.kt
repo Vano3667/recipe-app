@@ -28,6 +28,7 @@ import com.example.homemenu.ui.settings.SettingsContent
 import com.example.homemenu.ui.shopping.ShoppingContent
 import com.example.homemenu.ui.shopping.ShoppingUiState
 import com.example.homemenu.ui.theme.HomeMenuTheme
+import com.example.homemenu.ui.theme.isAppDark
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
 import org.junit.Test
