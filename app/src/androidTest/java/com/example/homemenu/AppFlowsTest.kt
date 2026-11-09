@@ -26,6 +26,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.homemenu.ui.nav.TopDestination
 import com.google.common.truth.Truth.assertThat
 import org.hamcrest.CoreMatchers.not
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.Rule
 import org.junit.runner.RunWith
@@ -43,8 +44,14 @@ class AppFlowsTest {
         it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true
     }
 
-    private fun waitTag(tag: String, timeout: Long = 15_000) =
-        rule.waitUntil(timeout) { rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    /** On timeout the CI log names the missing element (ComposeTimeoutException alone doesn't). */
+    private fun waitTag(tag: String, timeout: Long = 15_000) {
+        try {
+            rule.waitUntil(timeout) { rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: Throwable) {
+            throw AssertionError("Не появился элемент с тегом «$tag» за $timeout мс", e)
+        }
+    }
 
     private fun go(dest: TopDestination) {
         waitTag("nav_${dest.name}")
@@ -97,6 +104,40 @@ class AppFlowsTest {
         assertThat(rule.onAllNodes(tagPrefix("shopping_item_")).fetchSemanticsNodes()).isNotEmpty()
     }
 
+    @Test fun addRecipeWithIngredient() {
+        go(TopDestination.RECIPES)
+        waitTag("add_recipe")
+        rule.onNodeWithTag("add_recipe").performClick()
+        waitTag("name_field")
+        val name = "Тестовый салат ${System.currentTimeMillis() % 10_000}"
+        rule.onNodeWithTag("name_field").performTextInput(name)
+        rule.onNodeWithTag("servings_field").performTextClearance()
+        rule.onNodeWithTag("servings_field").performTextInput("2")
+        rule.onNodeWithTag("add_ingredient").performScrollTo().performClick()
+        waitTag("product_search")
+        rule.onNodeWithTag("product_search").performTextInput("Молоко")
+        waitTag("product_Молоко")
+        rule.onNodeWithTag("product_Молоко").performClick()
+        waitTag("amount_field_0")
+        rule.onNodeWithTag("amount_field_0").performScrollTo().performTextClearance()
+        rule.onNodeWithTag("amount_field_0").performTextInput("200")
+        rule.onNodeWithTag("save_recipe").performClick()
+        // The editor closes and the saved recipe is shown: detail screen on a phone, list + detail pane on a tablet.
+        try {
+            rule.waitUntil(15_000) {
+                rule.onAllNodesWithTag("name_field").fetchSemanticsNodes().isEmpty() &&
+                    rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (e: Throwable) {
+            throw AssertionError("Рецепт «$name» не появился после сохранения", e)
+        }
+    }
+
+    // TODO(фото): сценарий отключён вместе с добавлением фото. Снять @Ignore, когда будут выполнены шаги
+    //  из TODO(фото) в RecipeEditScreen.kt (photoPicker, исправление PhotoStorage.importPhoto, разрешения).
+    //  Заодно усилить последнюю проверку: onAllNodesWithText(name) находит название ещё в поле name_field,
+    //  до сохранения, — лучше ждать закрытия редактора, как в addRecipeWithIngredient.
+    @Ignore("TODO(фото): добавление фото временно отключено")
     @Test fun addRecipeWithPhotoFromGallery() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val img = File(ctx.cacheDir, "ui_test_photo.jpg")

@@ -63,6 +63,10 @@ fun RecipePhoto(file: File?, modifier: Modifier = Modifier, contentDescription: 
 /**
  * Gallery (Photo Picker — no storage permission needed) + Camera (TakePicture with runtime CAMERA permission).
  * [createCameraUri] must return a FileProvider content:// URI.
+ *
+ * TODO(фото): сейчас нигде не используется — добавление фото временно отключено. Подключается в
+ *  RecipeEditRoute через параметр photoPicker у RecipeEditContent (см. TODO(фото) в RecipeEditScreen.kt).
+ *  Камере нужно разрешение CAMERA в AndroidManifest.xml (сейчас закомментировано).
  */
 @Composable
 fun PhotoPickerField(

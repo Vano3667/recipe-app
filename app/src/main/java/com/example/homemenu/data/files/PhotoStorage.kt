@@ -35,6 +35,13 @@ class PhotoStorage @Inject constructor(@ApplicationContext private val context: 
     /** Decodes, rotates per EXIF, downsizes to [MAX_EDGE] px long edge, re-encodes JPEG ≤ [MAX_BYTES]. */
     suspend fun importPhoto(uri: Uri): String = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
+        // TODO(фото): ИЗВЕСТНАЯ ОШИБКА — исправить перед включением добавления фото.
+        //  При inJustDecodeBounds = true BitmapFactory.decodeStream() всегда возвращает null (читаются только
+        //  размеры в bounds), поэтому `?: error(...)` ниже срабатывает на любом файле и пользователь видит
+        //  «Не удалось открыть фото» — добавить фото было невозможно. Правильный вариант:
+        //      (resolver.openInputStream(uri) ?: error("Не удалось открыть фото"))
+        //          .use { BitmapFactory.decodeStream(it, null, bounds) }
+        //  Сейчас функция не вызывается: добавление фото отключено (см. TODO(фото) в RecipeEditScreen.kt).
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
             ?: error("Не удалось открыть фото")
