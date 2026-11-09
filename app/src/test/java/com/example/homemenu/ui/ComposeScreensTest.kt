@@ -11,7 +11,9 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.homemenu.F
 import com.example.homemenu.domain.PlannedDish
@@ -57,8 +59,10 @@ class ComposeScreensTest {
             }
         }
         rule.onNodeWithTag("ingredient_amount_0").assertTextEquals("200 г")
-        rule.onNodeWithTag("servings_minus").performClick()
-        rule.onNodeWithTag("servings_minus").performClick()
+        rule.onNodeWithTag("servings_minus").performSemanticsAction(SemanticsActions.OnClick)
+        rule.waitForIdle()
+        rule.onNodeWithTag("servings_minus").performSemanticsAction(SemanticsActions.OnClick)
+        rule.waitForIdle()
         rule.onNodeWithTag("ingredient_amount_0").assertTextEquals("100 г")
         rule.onNodeWithTag("ingredient_amount_3").assertTextEquals("~1 ст. л.")
     }
@@ -75,8 +79,8 @@ class ComposeScreensTest {
                 )
             }
         }
-        rule.onNodeWithTag("shopping_amount_Молоко").assertTextEquals("600 мл")
-        rule.onNodeWithTag("shopping_item_Молоко").performClick()
+        rule.onNodeWithTag("shopping_amount_Молоко", useUnmergedTree = true).assertTextEquals("600 мл")
+        rule.onNodeWithTag("shopping_item_Молоко").performSemanticsAction(SemanticsActions.OnClick)
         assertThat(toggled).containsExactly("2|ML")
         rule.onNodeWithText("Молочные продукты", substring = true).assertIsDisplayed()
     }
@@ -92,7 +96,7 @@ class ComposeScreensTest {
                 )
             }
         }
-        rule.onNodeWithText("Открыть меню").performClick()
+        rule.onNodeWithText("Открыть меню").performSemanticsAction(SemanticsActions.OnClick)
         assertThat(opened).isTrue()
     }
 
