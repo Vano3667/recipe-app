@@ -26,7 +26,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.example.homemenu.ui.nav.TopDestination
 import com.google.common.truth.Truth.assertThat
 import org.hamcrest.CoreMatchers.not
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.Rule
 import org.junit.runner.RunWith
@@ -150,11 +149,7 @@ class AppFlowsTest {
         }
     }
 
-    // TODO(фото): сценарий отключён вместе с добавлением фото. Снять @Ignore, когда будут выполнены шаги
-    //  из TODO(фото) в RecipeEditScreen.kt (photoPicker, исправление PhotoStorage.importPhoto, разрешения).
-    //  Заодно усилить последнюю проверку: onAllNodesWithText(name) находит название ещё в поле name_field,
-    //  до сохранения, — лучше ждать закрытия редактора, как в addRecipeWithIngredient.
-    @Ignore("TODO(фото): добавление фото временно отключено")
+    /** Галерея подменена через Espresso-Intents: возвращает подготовленный JPEG 1600×1200. */
     @Test fun addRecipeWithPhotoFromGallery() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val img = File(ctx.cacheDir, "ui_test_photo.jpg")
@@ -177,6 +172,12 @@ class AppFlowsTest {
             rule.onNodeWithTag("servings_field").performTextClearance()
             rule.onNodeWithTag("servings_field").performTextInput("2")
             rule.onNodeWithTag("photo_gallery").performClick()
+            // Импорт идёт в фоне: ждём, пока сжатое фото появится в filesDir/photos.
+            try {
+                rule.waitUntil(15_000) { (File(ctx.filesDir, "photos").listFiles()?.size ?: 0) > photosBefore }
+            } catch (e: Throwable) {
+                throw AssertionError("Фото из галереи не сохранилось в filesDir/photos", e)
+            }
             rule.waitForIdle()
             rule.onNodeWithTag("add_ingredient").performScrollTo().performClick()
             waitTag("product_search")
@@ -187,7 +188,15 @@ class AppFlowsTest {
             rule.onNodeWithTag("amount_field_0").performScrollTo().performTextClearance()
             rule.onNodeWithTag("amount_field_0").performTextInput("200")
             rule.onNodeWithTag("save_recipe").performClick()
-            rule.waitUntil(15_000) { rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty() }
+            // Редактор закрылся, сохранённый рецепт показан (как в addRecipeWithIngredient).
+            try {
+                rule.waitUntil(15_000) {
+                    rule.onAllNodesWithTag("name_field").fetchSemanticsNodes().isEmpty() &&
+                        rule.onAllNodesWithText(name).fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch (e: Throwable) {
+                throw AssertionError("Рецепт «$name» с фото не появился после сохранения", e)
+            }
             val photosAfter = File(ctx.filesDir, "photos").listFiles()?.size ?: 0
             assertThat(photosAfter).isGreaterThan(photosBefore)
         } finally {

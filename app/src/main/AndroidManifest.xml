@@ -2,18 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- TODO(фото): добавление фото временно отключено, поэтому разрешения камеры и галереи убраны.
-         Чтобы вернуть функцию (см. TODO(фото) в RecipeEditScreen.kt), раскомментируйте:
-
+    <!-- Камера для фото блюда. Галерея работает через системный Photo Picker
+         (на старых устройствах — через выбор документов), разрешения на чтение медиа не нужны. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-
-         Галерея работает через системный Photo Picker (разрешение не нужно); READ_* объявлялись для
-         устройств, где выбор фото откатывается на старый выбор документов. -->
 
     <application
         android:name=".HomeMenuApp"

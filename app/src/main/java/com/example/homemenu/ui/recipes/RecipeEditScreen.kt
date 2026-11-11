@@ -67,8 +67,7 @@ import com.example.homemenu.domain.model.MeasureUnit
 import com.example.homemenu.domain.model.Product
 import com.example.homemenu.domain.model.Step
 import com.example.homemenu.domain.model.Tag
-// TODO(фото): вернуть этот импорт вместе с photoPicker в RecipeEditRoute (см. ниже).
-// import com.example.homemenu.ui.components.PhotoPickerField
+import com.example.homemenu.ui.components.PhotoPickerField
 import com.example.homemenu.ui.components.SectionTitle
 import com.example.homemenu.ui.components.TagDot
 import com.example.homemenu.ui.theme.TagPalette
@@ -99,30 +98,21 @@ fun RecipeEditRoute(onClose: () -> Unit, onSaved: (Long) -> Unit, vm: RecipeEdit
         snackbar = snackbar, onChange = vm::update, onSave = vm::save, onClose = onClose,
         onAddProduct = { n, u, d, done -> vm.addCustomProduct(n, u, d, done) },
         onAddTag = vm::addCustomTag,
-        // TODO(фото): добавление фото (главное фото рецепта + фото шагов; галерея и камера) временно
-        //  отключено: photoPicker не передаётся, поэтому блоков фото на экране нет. Что хотели сделать:
-        //  выбор из галереи (системный Photo Picker), снимок камерой (TakePicture + FileProvider),
-        //  сжатие до 1080 px и сохранение в filesDir/photos (PhotoStorage.importPhoto). Готовый код уже есть:
-        //  PhotoPickerField (ui/components/PhotoPicker.kt), RecipeEditViewModel.importPhoto / cameraUri / photoFile.
-        //  Чтобы вернуть:
-        //  1) исправить ошибку в PhotoStorage.importPhoto (см. TODO(фото) там);
-        //  2) вернуть разрешения камеры и галереи в AndroidManifest.xml (см. TODO(фото) там);
-        //  3) раскомментировать блок ниже и импорт PhotoPickerField в начале файла;
-        //  4) снять @Ignore с AppFlowsTest.addRecipeWithPhotoFromGallery.
-        // photoPicker = { name, stepIndex, tagPrefix ->
-        //     PhotoPickerField(
-        //         photo = vm.photoFile(name),
-        //         onPicked = { vm.importPhoto(it, stepIndex) },
-        //         onRemove = {
-        //             vm.update { f ->
-        //                 if (stepIndex == null) f.copy(photoFile = null)
-        //                 else f.copy(steps = f.steps.mapIndexed { i, s -> if (i == stepIndex) s.copy(photoFile = null) else s })
-        //             }
-        //         },
-        //         createCameraUri = vm::cameraUri,
-        //         tagPrefix = tagPrefix,
-        //     )
-        // },
+        // Фото: главное фото рецепта (stepIndex == null) и фото шагов; галерея (системный Photo Picker) и камера.
+        photoPicker = { name, stepIndex, tagPrefix ->
+            PhotoPickerField(
+                photo = vm.photoFile(name),
+                onPicked = { vm.importPhoto(it, stepIndex) },
+                onRemove = {
+                    vm.update { f ->
+                        if (stepIndex == null) f.copy(photoFile = null)
+                        else f.copy(steps = f.steps.mapIndexed { i, s -> if (i == stepIndex) s.copy(photoFile = null) else s })
+                    }
+                },
+                createCameraUri = vm::cameraUri,
+                tagPrefix = tagPrefix,
+            )
+        },
     )
 }
 
@@ -141,7 +131,7 @@ fun RecipeEditContent(
     onClose: () -> Unit,
     onAddProduct: (String, MeasureUnit, Department, (Product) -> Unit) -> Unit,
     onAddTag: (String, String) -> Unit,
-    // TODO(фото): слот выбора фото (галерея / камера). null — фото отключено, блоки фото не показываются.
+    // Слот выбора фото (галерея / камера). null — блоки фото не показываются (например, в Robolectric-тестах).
     //  stepIndex == null — главное фото рецепта (теги "photo_*"), иначе фото шага (теги "step_photo_<i>_*").
     photoPicker: @Composable ((name: String?, stepIndex: Int?, tagPrefix: String) -> Unit)? = null,
 ) {
@@ -163,7 +153,7 @@ fun RecipeEditContent(
                 .padding(16.dp).widthIn(max = 840.dp),
         ) {
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            // TODO(фото): здесь, над названием, — главное фото рецепта. Показывается, только если передан photoPicker.
+            // Главное фото рецепта — над названием.
             if (photoPicker != null) {
                 photoPicker(form.photoFile, null, "photo")
                 Spacer(Modifier.height(12.dp))
@@ -248,7 +238,7 @@ fun RecipeEditContent(
                             placeholder = { Text("Опишите, что сделать") },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp).testTag("step_field_$i"),
                         )
-                        // TODO(фото): здесь, под текстом шага, — фото шага. Показывается, только если передан photoPicker.
+                        // Фото шага — под текстом шага.
                         if (photoPicker != null) {
                             Spacer(Modifier.height(8.dp))
                             photoPicker(step.photoFile, i, "step_photo_$i")
