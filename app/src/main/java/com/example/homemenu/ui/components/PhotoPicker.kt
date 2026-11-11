@@ -10,11 +10,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -23,7 +25,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -40,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
@@ -92,14 +97,36 @@ fun PhotoPickerField(
     }
 
     Column(modifier) {
-        RecipePhoto(photo, Modifier.fillMaxWidth().aspectRatio(16f / 9f), "Фото")
+        Box(Modifier.fillMaxWidth()) {
+            RecipePhoto(photo, Modifier.fillMaxWidth().aspectRatio(16f / 9f), "Фото")
+            if (photo != null) {
+                // Remove action sits on the photo itself, so the button row never runs out of width.
+                FilledTonalIconButton(
+                    onClick = onRemove,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("${tagPrefix}_remove"),
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = "Убрать фото")
+                }
+            }
+        }
         Spacer(Modifier.size(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             OutlinedButton(
                 onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                modifier = Modifier.testTag("${tagPrefix}_gallery"),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f).testTag("${tagPrefix}_gallery"),
             ) {
-                Icon(Icons.Filled.Image, null); Spacer(Modifier.width(6.dp)); Text("Галерея")
+                Icon(Icons.Filled.Image, null)
+                Spacer(Modifier.width(6.dp))
+                Text("Галерея", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             OutlinedButton(
                 onClick = {
@@ -110,12 +137,12 @@ fun PhotoPickerField(
                         camera.launch(uri)
                     } else permission.launch(Manifest.permission.CAMERA)
                 },
-                modifier = Modifier.testTag("${tagPrefix}_camera"),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f).testTag("${tagPrefix}_camera"),
             ) {
-                Icon(Icons.Filled.CameraAlt, null); Spacer(Modifier.width(6.dp)); Text("Камера")
-            }
-            if (photo != null) {
-                TextButton(onClick = onRemove) { Icon(Icons.Filled.Close, null); Text("Убрать") }
+                Icon(Icons.Filled.CameraAlt, null)
+                Spacer(Modifier.width(6.dp))
+                Text("Камера", maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
