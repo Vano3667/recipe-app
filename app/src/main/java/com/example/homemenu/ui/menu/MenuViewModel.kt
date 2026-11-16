@@ -56,16 +56,22 @@ data class MenuUiState(
     val recipes: Map<Long, Recipe> = emptyMap(),
     val tags: List<Tag> = emptyList(),
 ) {
-    fun entry(date: LocalDate, slot: MealSlot) = entries.firstOrNull { it.date == date && it.slot == slot }
+    /** All dishes of one meal in display order (Task 3: a meal can hold several recipes). */
+    fun dishes(date: LocalDate, slot: MealSlot): List<MenuEntry> =
+        entries.filter { it.date == date && it.slot == slot }.sortedWith(compareBy({ it.position }, { it.id }))
+
+    /** First dish of a meal (v1 API, kept for existing callers and tests). */
+    fun entry(date: LocalDate, slot: MealSlot): MenuEntry? = dishes(date, slot).firstOrNull()
 
     val summary: MenuSummary get() {
         val valid = entries.filter { recipes.containsKey(it.recipeId) }
         val days = range.days
         val kcalKnown = valid.filter { recipes[it.recipeId]?.calories != null }
         val totalKcal = kcalKnown.sumOf { (recipes[it.recipeId]!!.calories ?: 0) * it.servings }
+        val filledMeals = entries.map { it.date to it.slot }.distinct().size
         return MenuSummary(
             plannedDishes = valid.size,
-            emptySlots = days.size * MealSlot.entries.size - entries.size,
+            emptySlots = (days.size * MealSlot.entries.size - filledMeals).coerceAtLeast(0),
             uniqueRecipes = valid.map { it.recipeId }.distinct().size,
             totalServings = valid.sumOf { it.servings },
             avgKcalPerDay = if (kcalKnown.isEmpty()) null else totalKcal / days.size,
@@ -96,12 +102,29 @@ class MenuViewModel @Inject constructor(
     fun thisWeek() { range.value = DateRange.weekOf(LocalDate.now()) }
     fun setRange(from: LocalDate, to: LocalDate) { range.value = DateRange(minOf(from, to), maxOf(from, to)) }
 
-    fun setSlot(date: LocalDate, slot: MealSlot, recipeId: Long, servings: Int) = viewModelScope.launch {
-        menu.setSlot(date, slot, recipeId, servings.coerceAtLeast(1))
+    /** v1 name: adds the dish to the end of the meal. */
+    fun setSlot(date: LocalDate, slot: MealSlot, recipeId: Long, servings: Int) = addDish(date, slot, recipeId, servings)
+
+    /** Adds a dish to the end of a meal; [onResult] gets false if the meal already has this recipe. */
+    fun addDish(date: LocalDate, slot: MealSlot, recipeId: Long, servings: Int, onResult: (Boolean) -> Unit = {}) = viewModelScope.launch {
+        onResult(menu.addToSlot(date, slot, recipeId, servings.coerceAtLeast(1)))
     }
+
+    /** Replaces the recipe of one dish (place and servings kept); false if the meal already has that recipe. */
+    fun replace(entryId: Long, recipeId: Long, onResult: (Boolean) -> Unit = {}) = viewModelScope.launch {
+        onResult(menu.replaceRecipe(entryId, recipeId))
+    }
+
+    /** Moves a dish up (-1) or down (+1) inside its meal. */
+    fun reorder(entryId: Long, delta: Int) = viewModelScope.launch { menu.reorder(entryId, delta) }
+
     fun updateServings(entryId: Long, servings: Int) = viewModelScope.launch { menu.updateServings(entryId, servings.coerceAtLeast(1)) }
     fun clear(entryId: Long) = viewModelScope.launch { menu.clear(entryId) }
-    fun move(entryId: Long, toDate: LocalDate, toSlot: MealSlot) = viewModelScope.launch { menu.move(entryId, toDate, toSlot) }
+
+    /** Drag & drop to another meal; false if the target meal already has this recipe. */
+    fun move(entryId: Long, toDate: LocalDate, toSlot: MealSlot, onResult: (Boolean) -> Unit = {}) = viewModelScope.launch {
+        onResult(menu.move(entryId, toDate, toSlot))
+    }
 
     /** Returns how many slots were filled via [onDone]. */
     fun generate(options: GeneratorOptions, onDone: (Int) -> Unit) = viewModelScope.launch {
