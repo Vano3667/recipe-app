@@ -88,6 +88,7 @@ fun SettingsRoute(vm: SettingsViewModel = hiltViewModel()) {
                     arrayOf("application/zip", "application/x-zip-compressed", "application/json", "text/plain", "application/octet-stream"),
                 )
             },
+            appearance = { AppearanceSection() },
         )
     }
     staged?.let { s ->
@@ -170,6 +171,10 @@ fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
     )
 }
 
+/**
+ * [appearance] = content of the «Оформление» card (themes + custom colours), shown right below the
+ * light/dark card. Null hides the card, so tests that render SettingsContent without Hilt keep working.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsContent(
@@ -180,6 +185,7 @@ fun SettingsContent(
     onImport: () -> Unit,
     modifier: Modifier = Modifier,
     onExportJson: () -> Unit = {},
+    appearance: (@Composable () -> Unit)? = null,
 ) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
@@ -204,6 +210,16 @@ fun SettingsContent(
                         }
                     }
                 }
+                if (appearance != null) {
+                    Text(
+                        "Светлый и тёмный режим относятся к теме «Классическая». Другие темы — в разделе «Оформление» ниже.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (appearance != null) {
+                SettingsCard("Оформление") { appearance() }
             }
 
             SettingsCard("Резервная копия") {
