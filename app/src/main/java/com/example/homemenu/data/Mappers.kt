@@ -28,16 +28,18 @@ fun RecipeFull.toDomain() = Recipe(
     cookingTimeMin = recipe.cookingTimeMin,
     difficulty = Difficulty.parse(recipe.difficulty),
     category = Category.parse(recipe.category),
-    cuisine = recipe.cuisine,
     calories = recipe.calories,
     servings = recipe.servings,
-    ingredients = ingredients.sortedBy { it.ingredient.position }.map {
+    ingredients = ingredients.sortedWith(compareBy({ it.ingredient.position }, { it.ingredient.id })).map {
         Ingredient(it.product.toDomain(), it.ingredient.amount, MeasureUnit.parse(it.ingredient.unit))
     },
-    steps = steps.sortedBy { it.position }.map { Step(it.text, it.photoFile) },
+    steps = steps.sortedWith(compareBy({ it.position }, { it.id })).map { Step(it.text, it.photoFile) },
     notes = recipe.notes,
     tags = tags.map { it.toDomain() }.sortedBy { it.id },
     createdAt = recipe.createdAt,
+    description = recipe.description,
+    prepTimeMin = recipe.prepTimeMin,
+    ovenTempC = recipe.ovenTempC,
 )
 
-fun MenuEntryEntity.toDomain() = MenuEntry(id, LocalDate.parse(date), MealSlot.parse(slot), recipeId, servings)
+fun MenuEntryEntity.toDomain() = MenuEntry(id, LocalDate.parse(date), MealSlot.parse(slot), recipeId, servings, position)
