@@ -17,7 +17,6 @@ import javax.inject.Singleton
  * Idempotent seeding:
  *  - catalog & tags: INSERT OR IGNORE on unique name → never duplicated on upgrade, new seed items get appended;
  *  - demo recipes: only once (flag in user_settings) and only if the recipes table is empty.
- * The seed list still carries a cuisine string per recipe; it is not used any more (cuisines were removed).
  */
 @Singleton
 class Seeder @Inject constructor(private val db: AppDatabase) {
