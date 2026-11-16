@@ -2,7 +2,7 @@
 
 Persistent continuation guide for AI coding agents working on this repository.
 Read this file first, then `AGENT.md` (older notes, Russian; its "commit to main" rule is superseded).
-Last updated: 2026-11-16 16:30 UTC (agent #5 "Betty").
+Last updated: 2026-11-16 17:05 UTC (agent #6 "Frank").
 
 ---
 
@@ -29,14 +29,15 @@ Last updated: 2026-11-16 16:30 UTC (agent #5 "Betty").
 - `data/repo/Repositories.kt` (MenuRepository addToSlot/replaceRecipe/reorder/move/clear)
 - `data/files/BackupManager.kt`, `domain/backup/*` (Task 4)
 - `domain/IngredientLineParser.kt` (Task 1 parser)
+- `ui/recipes/RecipeDetailRoute.kt` (share text, Sharesheet, clipboard), `domain/RecipeTextParser.kt` (Task 5 text import parser)
 
 ### Working rules
 - No local JDK/Gradle/SDK. Code changes go through the GitHub API; **CI is the only build/test environment**.
 - Commit to `modernization`; merge to `main` only via PR after CI is green.
 - Docs-only commits: `[skip ci]`. Multi-part changes: intermediate parts `[skip ci]`, last part without it.
 - Never force-push, rewrite history, or commit keystores/passwords/tokens.
-- Tooling: "get file contents" returns only the blob SHA (use it as `sha` for updates). Read bodies from commit diffs (`get_commit` full_patch). `87a602d` = original upload of every file; with `perPage=1, page=N` one file is returned (RecipeEditScreen = 36, MenuScreen = 32, MenuViewModel = 33). Write one file per commit.
-- **User instruction (2026-11-17, agent #5): write the next tasks immediately without waiting for CI results; fix failures afterwards.** Agent #5's connection has no Actions tool, so CI results of its commits are unread.
+- Tooling: "get file contents" returns only the blob SHA (use it as `sha` for updates). Read bodies from commit diffs (`get_commit` full_patch). `87a602d` = original upload of every file; with `perPage=1, page=N` one file is returned (RecipeEditScreen = 36, MenuScreen = 32, MenuViewModel = 33). Write one file per commit. Full body of this file = `eb4350c` patch (whole-file rewrite) + later diffs.
+- **User instruction (2026-11-17, agent #5): write the next tasks immediately without waiting for CI results; fix failures afterwards.** Agents #5 and #6 had no Actions tool, so CI results of their commits are unread.
 
 ---
 
@@ -46,7 +47,7 @@ Last updated: 2026-11-16 16:30 UTC (agent #5 "Betty").
 2. [ ] Tags redesign + full cuisine removal — IMPLEMENTED
 3. [ ] Multiple recipes per meal — IMPLEMENTED (UI + data)
 4. [ ] Complete ZIP and JSON export/import — IMPLEMENTED
-5. [ ] Recipe sharing + text import — IN PROGRESS
+5. [ ] Recipe sharing + text import — IN PROGRESS (share text/Sharesheet/clipboard done, text parser + tests written, import UI missing)
 6. [ ] Fix existing import bug — BLOCKED, WAITING FOR USER FILE
 7. [ ] Six themes + custom colors — IN PROGRESS (storage only)
 8. [ ] Safe APK updates — IN PROGRESS, signing BLOCKED
@@ -59,11 +60,11 @@ Supporting: migration test on real v1 DB; data preservation; UI consistency; tes
 
 Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 
-**Global state:** last known green: `5be7b4d` (CI #17, all jobs) and `0fec6c8` (CI #18 build job green; API 34 flaky, F7). Agent #5 pushed `cfbd8d2`..`2e76d8f` (Task 1 UI, Task 3 UI). CI ran on `95cbf59` and `2e76d8f`; **results not read yet** (F8).
+**Global state:** last known green: `5be7b4d` (CI #17, all jobs) and `0fec6c8` (CI #18 build job green; API 34 flaky, F7). Agent #5 pushed `cfbd8d2`..`2e76d8f` (Task 1 UI, Task 3 UI). Agent #6 pushed `1e8f0b8`, `ac6bcb7` (Task 5 parser + tests). CI ran on `95cbf59`, `2e76d8f`, `ac6bcb7`; **results not read yet** (F8).
 
 ### Task 1 — Bulk ingredient input: IMPLEMENTED (UI unverified)
 - TESTED: `domain/IngredientLineParser.kt` (`9da0cbc`) + `IngredientLineParserTest` (`0fec6c8`, green in CI #18).
-- IMPLEMENTED (`cfbd8d2`, `ab3c0f8`): `ui/recipes/BulkIngredientsDialog.kt` — "Вставить списком" button next to "Добавить ингредиент" (tag `bulk_ingredients`). Dialog: paste (`bulk_input`) -> "Разобрать" (`bulk_parse`) -> preview rows with include checkbox, editable name / amount / unit, remove (`bulk_remove_i`), "not recognized" and "duplicate" hints -> "Добавить (n)" (`bulk_add_all`). Duplicates (within paste or vs ingredients already in the form) start unchecked. `BulkIngredients.append` matches products by normalized name and creates missing ones through the existing `onAddProduct` one after another, so order is preserved. Single-add flow untouched.
+- IMPLEMENTED (`cfbd8d2`, `ab3c0f8`): `ui/recipes/BulkIngredientsDialog.kt` — "Вставить списком" button next to "Добавить ингредиент" (tag `bulk_ingredients`). Dialog: paste (`bulk_input`) -> "Разобрать" (`bulk_parse`) -> preview rows with include checkbox, editable name / amount / unit, remove (`bulk_remove_i`), "not recognized" and "duplicate" hints -> "Добавить (n)" (`bulk_add_all`). Duplicates start unchecked. `BulkIngredients.append` matches products by normalized name and creates missing ones through `onAddProduct` sequentially, so order is preserved. Single-add flow untouched.
 - Unit tests `ui/BulkIngredientsTest.kt` (`95cbf59`), result unknown.
 - Missing: Robolectric/instrumented test of the dialog; known risk: if `vm.addCustomProduct` fails and never calls back, remaining rows are not added (check `RecipeEditViewModel.addCustomProduct`).
 
@@ -73,19 +74,21 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 
 ### Task 3 — Multiple recipes per meal: IMPLEMENTED (UI unverified)
 - Data (`047d9e6`, `aa8edfe`): `menu_entries.position`, non-unique `(date, slot)` index, repository addToSlot/replaceRecipe/reorder/move/clear with renumbering; same recipe twice in one meal refused.
-- UI (`4c03f6a` ViewModel, `2e76d8f` screen): `MenuUiState.dishes(date, slot)`; each meal lists its dishes; per dish: long-press drag to another meal, up/down (`dish_up_<id>`, `dish_down_<id>`), replace (`dish_replace_<id>`, picker without servings), remove (`dish_remove_<id>`, contentDescription now "Убрать блюдо", was "Очистить слот"), servings, cook. Empty meal: whole slot clickable (tag `slot_<date>_<SLOT>` unchanged); filled meal: "Ещё блюдо" (`slot_add_<date>_<SLOT>`). Picker hides recipes already in the meal; refusals show a snackbar. `emptySlots` now counts empty meals.
-- Missing: check `MenuGeneratorUseCase` / `ShoppingListUseCase` for one-dish assumptions; tests for dishes()/summary and UI; migration test (F4). If tests click "Очистить слот" or the slot itself to open the cook button, update them.
+- UI (`4c03f6a` ViewModel, `2e76d8f` screen): `MenuUiState.dishes(date, slot)`; each meal lists its dishes; per dish: long-press drag to another meal, up/down (`dish_up_<id>`, `dish_down_<id>`), replace (`dish_replace_<id>`), remove (`dish_remove_<id>`, contentDescription "Убрать блюдо", was "Очистить слот"), servings, cook. Empty meal: whole slot clickable (tag `slot_<date>_<SLOT>` unchanged); filled meal: "Ещё блюдо" (`slot_add_<date>_<SLOT>`). Picker hides recipes already in the meal; refusals show a snackbar.
+- Missing: check `MenuGeneratorUseCase` / `ShoppingListUseCase` for one-dish assumptions; tests for dishes()/summary and UI; migration test (F4). If tests click "Очистить слот", update them.
 
 ### Task 4 — ZIP/JSON export/import: IMPLEMENTED
 - Format v2, staged import with preview/duplicate modes/single transaction/read-back (`862a437`, `1bec32b`); Settings UI (`94891a7`, `16c5dfb`); `BackupJsonTest` v2 (`1a764a1`).
 - Missing: round trip with photos, failed-import rollback test, instrumented import read-back.
 
 ### Task 5 — Sharing + text import: IN PROGRESS
-- Done: readable share text + clipboard in `ui/recipes/RecipeDetailRoute.kt` (`a8b6896`).
-- Missing: Sharesheet `ACTION_SEND text/plain` check, TXT export, pure share formatter + tests, text recipe parser (reuse `IngredientLineParser`) + editable preview, TXT import.
+- Done (`a8b6896`): readable share text `recipeShareText()` + Sharesheet (`Intent.ACTION_SEND` text/plain via `createChooser`, so Telegram/WhatsApp/e-mail/"Save to Files" work) + clipboard in `ui/recipes/RecipeDetailRoute.kt`. Single-recipe ZIP share also exists.
+- IMPLEMENTED (`1e8f0b8`): `domain/RecipeTextParser.kt`, pure. `parse(text) -> ParsedRecipeText(title, description, ingredients: List<ParsedIngredientLine>, steps, prepTimeMin, cookingTimeMin, servings, ovenTempC, calories, tags, notes, unrecognized)`. Reads the app's own share format, RU/EN section headers, key lines (times, servings incl. "На 4 порции" / "Serves 2", oven, kcal, "Теги:", #hashtags, "Заметки:"), numbered/"Шаг N" steps. Ingredients via `IngredientLineParser` (unknown lines kept with `recognized=false`). Category line "X · Y" goes to `unrecognized`. Footer "— из приложения «Домашнее меню»" ignored. Nothing invented.
+- Unit tests `domain/RecipeTextParserTest.kt` (`ac6bcb7`, 6 tests), CI result unknown.
+- Missing: (a) TXT export via `ActivityResultContracts.CreateDocument("text/plain")` in `RecipeDetailRoute.kt` (new `onExportTxt`); (b) "Импорт из текста" entry (Recipes screen menu or Settings): paste field + "open TXT" (`OpenDocument(arrayOf("text/plain"))`, read UTF-8) -> `RecipeTextParser.parse` -> open `RecipeEditScreen` prefilled (title, description, times, servings, oven, kcal, steps, notes + `unrecognized` appended to notes, tags matched/created by name, ingredients appended through `BulkIngredients.append`) so the user edits and confirms before saving; (c) optional `ACTION_SEND text/plain` intent-filter in the manifest routed to the same flow; (d) move `recipeShareText` to a pure domain formatter and add a round-trip test format -> parse.
 
 ### Task 6 — Existing import bug: BLOCKED — WAITING FOR USER FILE
-- Requested from the user again by agent #5. Do not report as fixed until the original file imports and its data is verified.
+- Requested from the user again by agents #5 and #6. Do not report as fixed until the original file imports and its data is verified.
 
 ### Task 7 — Themes + custom colors: IN PROGRESS (storage only)
 - Done: `user_settings.themeId` (default LEGACY), `customColors` JSON, in backup v2, `SettingsRepository.setAppearance`.
@@ -115,6 +118,8 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 | Bulk dialog in its own file; products created sequentially via existing `onAddProduct` | Small files; order preserved without ViewModel changes | cfbd8d2 |
 | Menu: one drop target per meal, drag handle per dish; picker hides recipes already in the meal | Simple UI, duplicates prevented in UI and repository | 2e76d8f |
 | `MenuContent` new params `onReplace`/`onReorder` have defaults; `entry()` kept | Existing tests keep compiling | 2e76d8f, 4c03f6a |
+| Text import parser is pure domain code returning a separate `ParsedRecipeText` (not `Recipe`) | No dependency on the Recipe model/ViewModel; preview maps it into the edit form, user confirms before save | 1e8f0b8 |
+| Text parser: key lines recognized in any section; "Приготовление: 40 мин" = cooking time; unplaced lines kept in `unrecognized`/description | Messenger texts put times after steps; never lose text | 1e8f0b8 |
 | Pending: signing (F2); versioning proposal versionCode +1 per release, versionName 1.1.0 | — | — |
 
 ---
@@ -126,12 +131,10 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 - Agent #2: `44d94bf` handoff.
 - Agent #3: `94891a7`, `5961b4f`, `1a764a1`, `4328ad3`, `a8b6896`, `16c5dfb`, `5be7b4d` (compile fix + UI; CI #17 green).
 - Agent #4: `3c0fac1` handoff, `9da0cbc` parser, `0fec6c8` parser tests, `eb4350c` handoff.
-- Agent #5 (2026-11-16 16:18-16:30 UTC):
-  - `cfbd8d2` BulkIngredientsDialog.kt (new) [skip ci]
-  - `ab3c0f8` RecipeEditScreen: "Вставить списком" [skip ci]
-  - `95cbf59` BulkIngredientsTest — CI triggered, result unread
-  - `4c03f6a` MenuViewModel multi-dish [skip ci]
-  - `2e76d8f` MenuScreen multi-dish — CI triggered, result unread
+- Agent #5 (2026-11-16 16:18-16:30 UTC): `cfbd8d2` BulkIngredientsDialog.kt [skip ci], `ab3c0f8` RecipeEditScreen "Вставить списком" [skip ci], `95cbf59` BulkIngredientsTest (CI triggered, unread), `4c03f6a` MenuViewModel [skip ci], `2e76d8f` MenuScreen (CI triggered, unread), `1f7fe64` handoff.
+- Agent #6 (2026-11-16 16:58-17:05 UTC):
+  - `1e8f0b8` domain/RecipeTextParser.kt (new) [skip ci]
+  - `ac6bcb7` RecipeTextParserTest (new) — CI triggered, result unread
   - this docs commit [skip ci]
 - All pushes verified by the API response (new commit SHA returned).
 
@@ -144,15 +147,15 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 - **F4 Room schemas not committed:** needed for a 1->2 `MigrationTestHelper` test. Generate v1 schema from `2ceef75` in CI, commit `app/schemas/.../1.json`, add `room-testing`.
 - **F5** `AGENT.md` outdated; this file supersedes it.
 - **F7 Flaky instrumented test on API 34:** CI #18 `AppFlowsTest.addRecipeWithIngredient` failed on pixel_tablet API 34 ("Не появился элемент с тегом «product_search»"), emulator GPU errors. Passed on API 29 and in #17. Likely flakiness, not proven.
-- **F8 CI results of agent #5 commits unread:** agent #5's GitHub connection exposes no Actions tools. Per user instruction, work continued without waiting. Next agent with Actions access: read runs for `95cbf59` and `2e76d8f` first and fix any compile/test errors (likely spots: `BulkIngredientsDialog.kt` imports, `MenuScreen.kt` `SwapHoriz` icon (needs material-icons-extended, already used for `DragIndicator`), tests referencing "Очистить слот").
+- **F8 CI results of agent #5/#6 commits unread:** their GitHub connection exposes no Actions tools. Per user instruction, work continued without waiting. Next agent with Actions access: read runs for `95cbf59`, `2e76d8f`, `ac6bcb7` first and fix any compile/test errors (likely spots: `BulkIngredientsDialog.kt` imports, `MenuScreen.kt` `SwapHoriz` icon, tests referencing "Очистить слот", regex details in `RecipeTextParser.kt` if a `RecipeTextParserTest` assertion fails).
 
 ---
 
 ## G. NEXT AGENT — START HERE
 
-1. **State:** `modernization` head = this docs commit; latest code commit `2e76d8f`. Last verified green `5be7b4d` / `0fec6c8`. Tasks 1 and 3 UI written but not CI-verified.
-2. **First:** read CI for `2e76d8f` (and `95cbf59`). Fix compile/test failures. Update `TEST_REPORT.md`.
-3. **Next action (per user: keep writing, fix later):** Task 5 — pure `domain/RecipeTextFormatter.kt` (share text, move logic from `RecipeDetailRoute.kt`) + tests; Sharesheet `Intent.ACTION_SEND` text/plain with `Intent.createChooser`; TXT export via `ActivityResultContracts.CreateDocument("text/plain")`; `domain/RecipeTextParser.kt` (title, sections «Ингредиенты»/«Приготовление», times, servings, tags; ingredient lines via `IngredientLineParser`; unknown text kept in notes) + editable preview that opens the edit form prefilled.
+1. **State:** `modernization` head = this docs commit; latest code commit `ac6bcb7`. Last verified green `5be7b4d` / `0fec6c8`. Tasks 1 and 3 UI and Task 5 parser written but not CI-verified.
+2. **First:** read CI for `ac6bcb7` (covers `95cbf59`, `2e76d8f` too). Fix compile/test failures. Update `TEST_REPORT.md`.
+3. **Next action:** Task 5 import UI, see Task 5 "Missing" (a)-(d). Start with (b): new file `ui/recipes/TextImportDialog.kt` (paste field + open TXT button + parse preview summary), then route the parsed result into `RecipeEditScreen` as initial state (inspect how `RecipeEditViewModel` loads a draft; `87a602d` page 37 + `5961b4f`).
 4. **Then:** Task 7 themes -> Task 2 leftovers grep -> Task 4 round-trip/rollback tests -> F4 migration test -> Task 8 (after user answer) -> Task 6 (after user file).
-5. **Files to inspect first:** `ui/recipes/RecipeDetailRoute.kt` (a8b6896), `ui/recipes/RecipeViewModels.kt` (87a602d page 37 + 5961b4f), `ui/nav/AppNav.kt` (87a602d page 34), `ui/theme/Theme.kt`, `ui/theme/Color.kt`, `MainActivity.kt`.
+5. **Files to inspect first:** `ui/recipes/RecipeDetailRoute.kt` (a8b6896), `ui/recipes/RecipeViewModels.kt` (87a602d page 37 + 5961b4f), `ui/nav/AppNav.kt` (87a602d page 34), `ui/theme/Theme.kt`, `ui/theme/Color.kt`, `MainActivity.kt`, `domain/RecipeTextParser.kt`.
 6. **Precautions:** never change `applicationId`; no `fallbackToDestructiveMigration`; keep legacy `cuisine` column; no merge to `main` until CI green and migration tested; no secrets in git.
