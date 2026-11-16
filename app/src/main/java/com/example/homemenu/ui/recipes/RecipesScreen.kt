@@ -77,15 +77,26 @@ fun RecipesRoute(
 ) {
     val state by vm.state.collectAsState()
     val selected by vm.selectedId.collectAsState()
+    var importText by rememberSaveable { mutableStateOf(false) }
+    if (importText) {
+        // Task 5: recipe from pasted text / TXT file; the new recipe opens after saving.
+        TextImportDialog(
+            onDismiss = { importText = false },
+            onSaved = { id ->
+                importText = false
+                if (expanded) vm.select(id) else onOpen(id)
+            },
+        )
+    }
     if (!expanded) {
-        RecipesListContent(state, vm::updateQuery, onOpen, onAdd, photo, selectedId = null)
+        RecipesListContent(state, vm::updateQuery, onOpen, onAdd, photo, selectedId = null, onImportText = { importText = true })
         return
     }
     // Master-detail for wide screens.
     val effectiveSelected = selected?.takeIf { id -> state.visible.any { it.id == id } } ?: state.visible.firstOrNull()?.id
     Row(Modifier.fillMaxSize().testTag("master_detail")) {
         Box(Modifier.weight(0.4f).fillMaxHeight()) {
-            RecipesListContent(state, vm::updateQuery, { vm.select(it) }, onAdd, photo, selectedId = effectiveSelected)
+            RecipesListContent(state, vm::updateQuery, { vm.select(it) }, onAdd, photo, selectedId = effectiveSelected, onImportText = { importText = true })
         }
         VerticalDivider()
         Box(Modifier.weight(0.6f).fillMaxHeight()) {
@@ -107,6 +118,7 @@ fun RecipesListContent(
     onAdd: () -> Unit,
     photo: (String?) -> File?,
     selectedId: Long?,
+    onImportText: (() -> Unit)? = null,
 ) {
     var showFilters by rememberSaveable { mutableStateOf(false) }
     var sortMenu by remember { mutableStateOf(false) }
@@ -123,7 +135,12 @@ fun RecipesListContent(
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            Text("Рецепты", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp))
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Рецепты", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                if (onImportText != null) {
+                    TextButton(onClick = onImportText, modifier = Modifier.testTag("import_text")) { Text("Из текста") }
+                }
+            }
             OutlinedTextField(
                 value = q.text,
                 onValueChange = { t -> onQueryChange { it.copy(text = t) } },
