@@ -72,6 +72,7 @@ fun RecipeDetailContent(
     onShareText: () -> Unit,
     onShareFile: () -> Unit,
     onCopyText: () -> Unit = {},
+    onExportTxt: () -> Unit = {},
 ) {
     var shareMenu by remember { mutableStateOf(false) }
     Scaffold(
@@ -87,6 +88,7 @@ fun RecipeDetailContent(
                         DropdownMenu(expanded = shareMenu, onDismissRequest = { shareMenu = false }) {
                             DropdownMenuItem(text = { Text("Как текст") }, onClick = { shareMenu = false; onShareText() }, modifier = Modifier.testTag("share_text"))
                             DropdownMenuItem(text = { Text("Скопировать текст") }, onClick = { shareMenu = false; onCopyText() }, modifier = Modifier.testTag("copy_text"))
+                            DropdownMenuItem(text = { Text("Сохранить как TXT") }, onClick = { shareMenu = false; onExportTxt() }, modifier = Modifier.testTag("export_txt"))
                             DropdownMenuItem(text = { Text("Как файл (.zip)") }, onClick = { shareMenu = false; onShareFile() })
                         }
                     }
