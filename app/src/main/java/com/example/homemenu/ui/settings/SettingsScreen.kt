@@ -172,8 +172,8 @@ fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
 }
 
 /**
- * [appearance] = content of the «Оформление» card (themes + custom colours). Null hides the card,
- * so tests that render SettingsContent without Hilt keep working.
+ * [appearance] = content of the «Оформление» card (themes + custom colours), shown right below the
+ * light/dark card. Null hides the card, so tests that render SettingsContent without Hilt keep working.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -194,17 +194,7 @@ fun SettingsContent(
         ) {
             Text("Настройки", style = MaterialTheme.typography.headlineLarge)
 
-            if (appearance != null) {
-                SettingsCard("Оформление") { appearance() }
-            }
-
             SettingsCard("Тема оформления") {
-                if (appearance != null) {
-                    Text(
-                        "Светлый и тёмный режим относятся к теме «Классическая».",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 Column(Modifier.selectableGroup()) {
                     ThemeMode.entries.forEach { m ->
                         Row(
@@ -220,6 +210,16 @@ fun SettingsContent(
                         }
                     }
                 }
+                if (appearance != null) {
+                    Text(
+                        "Светлый и тёмный режим относятся к теме «Классическая». Другие темы — в разделе «Оформление» ниже.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (appearance != null) {
+                SettingsCard("Оформление") { appearance() }
             }
 
             SettingsCard("Резервная копия") {
