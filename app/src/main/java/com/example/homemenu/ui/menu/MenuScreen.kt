@@ -32,7 +32,10 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -93,18 +96,26 @@ import java.time.LocalDate
 import kotlin.math.roundToInt
 
 private data class SlotKey(val date: LocalDate, val slot: MealSlot)
-private data class PickTarget(val date: LocalDate, val slot: MealSlot)
+
+/** Where the recipe picker writes: a new dish at the end of the meal, or a replacement for [replaceEntryId]. */
+private data class PickTarget(val date: LocalDate, val slot: MealSlot, val replaceEntryId: Long? = null)
 
 @Composable
 fun MenuRoute(onCook: (recipeId: Long, servings: Int) -> Unit, onAddRecipe: () -> Unit, vm: MenuViewModel = hiltViewModel()) {
     val state by vm.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val refused: (Boolean) -> Unit = { ok ->
+        if (!ok) scope.launch { snackbar.showSnackbar("Это блюдо уже есть в этом приёме пищи") }
+    }
     MenuContent(
         state = state,
         snackbar = snackbar,
         onPrev = vm::previous, onNext = vm::next, onThisWeek = vm::thisWeek, onRange = vm::setRange,
-        onSetSlot = vm::setSlot, onServings = vm::updateServings, onClear = vm::clear, onMove = vm::move,
+        onSetSlot = { d, s, id, n -> vm.addDish(d, s, id, n, refused) },
+        onServings = { id, n -> vm.updateServings(id, n) },
+        onClear = { id -> vm.clear(id) },
+        onMove = { id, d, s -> vm.move(id, d, s, refused) },
         onGenerate = { opts ->
             vm.generate(opts) { n ->
                 scope.launch { snackbar.showSnackbar(if (n > 0) "Заполнено слотов: $n" else "Нет подходящих рецептов или свободных слотов") }
@@ -112,6 +123,8 @@ fun MenuRoute(onCook: (recipeId: Long, servings: Int) -> Unit, onAddRecipe: () -
         },
         onCook = onCook,
         onAddRecipe = onAddRecipe,
+        onReplace = { id, recipeId -> vm.replace(id, recipeId, refused) },
+        onReorder = { id, delta -> vm.reorder(id, delta) },
     )
 }
 
@@ -131,12 +144,14 @@ fun MenuContent(
     onGenerate: (GeneratorOptions) -> Unit,
     onCook: (Long, Int) -> Unit,
     onAddRecipe: () -> Unit,
+    onReplace: (entryId: Long, recipeId: Long) -> Unit = { _, _ -> },
+    onReorder: (entryId: Long, delta: Int) -> Unit = { _, _ -> },
 ) {
     var showRange by remember { mutableStateOf(false) }
     var showGenerate by remember { mutableStateOf(false) }
     var pick by remember { mutableStateOf<PickTarget?>(null) }
 
-    // Drag & drop state (root coordinates).
+    // Drag & drop state (root coordinates). Drop targets are whole meals.
     val bounds = remember { mutableStateMapOf<SlotKey, Rect>() }
     var dragging by remember { mutableStateOf<MenuEntry?>(null) }
     var dragPos by remember { mutableStateOf(Offset.Zero) }
@@ -172,7 +187,7 @@ fun MenuContent(
                         Spacer(Modifier.height(12.dp))
                         if (state.entries.isEmpty()) {
                             Text(
-                                "Меню на этот период пустое. Нажмите «+» в слоте или «Автоподбор». Долгое нажатие на блюдо — перетащить.",
+                                "Меню на этот период пустое. Нажмите на приём пищи или «Автоподбор». В один приём можно добавить несколько блюд. Долгое нажатие на блюдо — перетащить.",
                                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Spacer(Modifier.height(8.dp))
@@ -186,6 +201,8 @@ fun MenuContent(
                                         day = day, width = dayWidth, state = state, hover = hover, draggingId = dragging?.id,
                                         onBounds = { slot, r -> bounds[SlotKey(day, slot)] = r },
                                         onAdd = { slot -> pick = PickTarget(day, slot) },
+                                        onReplace = { entry -> pick = PickTarget(entry.date, entry.slot, entry.id) },
+                                        onReorder = onReorder,
                                         onServings = onServings, onClear = onClear, onCook = onCook,
                                         onDragStart = { entry, start -> dragging = entry; dragPos = start },
                                         onDrag = { delta -> dragPos += delta },
@@ -219,12 +236,18 @@ fun MenuContent(
     if (showRange) RangePickerDialog(state.range.from, state.range.to, { showRange = false }) { f, t -> showRange = false; onRange(f, t) }
     if (showGenerate) GenerateDialog(state.tags, onDismiss = { showGenerate = false }) { showGenerate = false; onGenerate(it) }
     pick?.let { target ->
+        val inMeal = state.dishes(target.date, target.slot).map { it.recipeId }.toSet()
+        val replacing = target.replaceEntryId
         RecipePickerDialog(
-            title = "${target.slot.title}, ${target.date.dayMonth()}",
-            recipes = state.recipes.values.sortedBy { it.name },
+            title = (if (replacing != null) "Замена · " else "") + "${target.slot.title}, ${target.date.dayMonth()}",
+            recipes = state.recipes.values.filter { it.id !in inMeal }.sortedBy { it.name },
             preferred = target.slot.defaultCategory,
             onDismiss = { pick = null },
-            onPick = { r, servings -> pick = null; onSetSlot(target.date, target.slot, r.id, servings) },
+            onPick = { r, servings ->
+                pick = null
+                if (replacing != null) onReplace(replacing, r.id) else onSetSlot(target.date, target.slot, r.id, servings)
+            },
+            showServings = replacing == null,
         )
     }
 }
@@ -258,6 +281,8 @@ private fun DayCard(
     draggingId: Long?,
     onBounds: (MealSlot, Rect) -> Unit,
     onAdd: (MealSlot) -> Unit,
+    onReplace: (MenuEntry) -> Unit,
+    onReorder: (Long, Int) -> Unit,
     onServings: (Long, Int) -> Unit,
     onClear: (Long) -> Unit,
     onCook: (Long, Int) -> Unit,
@@ -277,64 +302,105 @@ private fun DayCard(
             Text("${day.weekdayName()}, ${day.dayMonth()}" + if (today) " · сегодня" else "", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(6.dp))
             MealSlot.entries.forEach { slot ->
-                val entry = state.entry(day, slot)
+                val dishes = state.dishes(day, slot)
                 val key = SlotKey(day, slot)
                 val isHover = hover == key
                 val bg by animateColorAsState(
                     if (isHover) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer, label = "slotBg",
                 )
-                var slotTopLeft by remember { mutableStateOf(Offset.Zero) }
                 Surface(
                     color = bg, shape = MaterialTheme.shapes.large,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                        .onGloballyPositioned { c -> val r = c.boundsInRoot(); slotTopLeft = r.topLeft; onBounds(slot, r) }
-                        .alpha(if (entry != null && entry.id == draggingId) 0.4f else 1f)
+                        .onGloballyPositioned { c -> onBounds(slot, c.boundsInRoot()) }
                         .testTag("slot_${day}_${slot.name}")
-                        .let { m ->
-                            if (entry == null) m.clickable { onAdd(slot) }
-                            else m.pointerInput(entry.id, day, slot) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { off -> onDragStart(entry, slotTopLeft + off) },
-                                    onDrag = { change, amount -> change.consume(); onDrag(amount) },
-                                    onDragEnd = onDragEnd,
-                                    onDragCancel = onDragCancel,
+                        .let { m -> if (dishes.isEmpty()) m.clickable { onAdd(slot) } else m },
+                ) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(slot.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (dishes.isEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Text(" Добавить блюдо", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        } else {
+                            dishes.forEachIndexed { i, entry ->
+                                if (i > 0) Spacer(Modifier.height(4.dp))
+                                DishRow(
+                                    entry = entry, recipe = state.recipes[entry.recipeId], index = i, count = dishes.size,
+                                    dragged = entry.id == draggingId,
+                                    onReplace = onReplace, onReorder = onReorder, onServings = onServings, onClear = onClear, onCook = onCook,
+                                    onDragStart = onDragStart, onDrag = onDrag, onDragEnd = onDragEnd, onDragCancel = onDragCancel,
                                 )
                             }
-                        },
-                ) {
-                    SlotContent(slot, entry, entry?.let { state.recipes[it.recipeId] }, onAdd, onServings, onClear, onCook)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth().clickable { onAdd(slot) }.testTag("slot_add_${day}_${slot.name}").padding(vertical = 6.dp),
+                            ) {
+                                Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                Text(" Ещё блюдо", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+/** One dish of a meal: long press drags it to another meal. */
 @Composable
-private fun SlotContent(
-    slot: MealSlot,
-    entry: MenuEntry?,
+private fun DishRow(
+    entry: MenuEntry,
     recipe: Recipe?,
-    onAdd: (MealSlot) -> Unit,
+    index: Int,
+    count: Int,
+    dragged: Boolean,
+    onReplace: (MenuEntry) -> Unit,
+    onReorder: (Long, Int) -> Unit,
     onServings: (Long, Int) -> Unit,
     onClear: (Long) -> Unit,
     onCook: (Long, Int) -> Unit,
+    onDragStart: (MenuEntry, Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
 ) {
-    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-        Text(slot.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (entry == null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                Text(" Добавить блюдо", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
-            }
-            return@Column
-        }
+    var topLeft by remember { mutableStateOf(Offset.Zero) }
+    val current by rememberUpdatedState(entry)
+    Column(
+        Modifier.fillMaxWidth()
+            .onGloballyPositioned { topLeft = it.boundsInRoot().topLeft }
+            .alpha(if (dragged) 0.4f else 1f)
+            .testTag("dish_${entry.id}")
+            .pointerInput(entry.id) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { off -> onDragStart(current, topLeft + off) },
+                    onDrag = { change, amount -> change.consume(); onDrag(amount) },
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragCancel,
+                )
+            },
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.DragIndicator, "Перетащить (долгое нажатие)", tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(18.dp))
             Text(
                 recipe?.name ?: "Рецепт удалён", style = MaterialTheme.typography.titleMedium, maxLines = 2,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 4.dp),
             )
-            IconButton(onClick = { onClear(entry.id) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Close, "Очистить слот", Modifier.size(18.dp)) }
+            if (count > 1) {
+                IconButton(onClick = { onReorder(entry.id, -1) }, enabled = index > 0, modifier = Modifier.size(32.dp).testTag("dish_up_${entry.id}")) {
+                    Icon(Icons.Filled.KeyboardArrowUp, "Выше", Modifier.size(18.dp))
+                }
+                IconButton(onClick = { onReorder(entry.id, 1) }, enabled = index < count - 1, modifier = Modifier.size(32.dp).testTag("dish_down_${entry.id}")) {
+                    Icon(Icons.Filled.KeyboardArrowDown, "Ниже", Modifier.size(18.dp))
+                }
+            }
+            IconButton(onClick = { onReplace(entry) }, modifier = Modifier.size(32.dp).testTag("dish_replace_${entry.id}")) {
+                Icon(Icons.Filled.SwapHoriz, "Заменить блюдо", Modifier.size(18.dp))
+            }
+            IconButton(onClick = { onClear(entry.id) }, modifier = Modifier.size(32.dp).testTag("dish_remove_${entry.id}")) {
+                Icon(Icons.Filled.Close, "Убрать блюдо", Modifier.size(18.dp))
+            }
         }
         if (recipe != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -355,6 +421,7 @@ fun RecipePickerDialog(
     preferred: com.example.homemenu.domain.model.Category?,
     onDismiss: () -> Unit,
     onPick: (Recipe, Int) -> Unit,
+    showServings: Boolean = true,
 ) {
     var query by remember { mutableStateOf("") }
     var servings by remember { mutableIntStateOf(2) }
@@ -368,8 +435,17 @@ fun RecipePickerDialog(
         text = {
             Column {
                 OutlinedTextField(query, { query = it }, label = { Text("Поиск") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text("Порции: "); Stepper(servings, { servings = it }, testTagPrefix = "pick_servings")
+                if (showServings) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text("Порции: "); Stepper(servings, { servings = it }, testTagPrefix = "pick_servings")
+                    }
+                }
+                if (list.isEmpty()) {
+                    Text(
+                        if (recipes.isEmpty()) "Все рецепты уже есть в этом приёме пищи" else "Ничего не найдено",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
                 }
                 LazyColumn(Modifier.heightIn(max = 320.dp).testTag("recipe_picker")) {
                     items(list, key = { it.id }) { r ->
