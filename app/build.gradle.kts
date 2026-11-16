@@ -6,19 +6,25 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+// Build date shown in Settings > «О приложении». UTC, so every machine produces the same format.
+val buildDate: String = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()
+
 android {
     namespace = "com.example.homemenu"
     compileSdk = 34
 
     defaultConfig {
+        // Never change applicationId: updates over the installed app depend on it.
         applicationId = "com.example.homemenu"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // Increase versionCode by 1 for every APK given to the user.
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("ru")
+        buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
     }
 
     buildTypes {
