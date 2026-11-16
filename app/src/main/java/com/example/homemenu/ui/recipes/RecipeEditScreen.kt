@@ -2,6 +2,7 @@ package com.example.homemenu.ui.recipes
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,9 +32,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -60,7 +64,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.homemenu.domain.model.Category
-import com.example.homemenu.domain.model.DEFAULT_CUISINES
 import com.example.homemenu.domain.model.Department
 import com.example.homemenu.domain.model.Difficulty
 import com.example.homemenu.domain.model.MeasureUnit
@@ -164,6 +167,10 @@ fun RecipeEditContent(
                 supportingText = errors.name?.let { { Text(it) } }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("name_field"),
             )
+            OutlinedTextField(
+                value = form.description, onValueChange = { v -> onChange { it.copy(description = v.take(1000)) } },
+                label = { Text("Описание") }, modifier = Modifier.fillMaxWidth().testTag("description_field"),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = form.timeText, onValueChange = { v -> onChange { it.copy(timeText = v.filter(Char::isDigit).take(4)) } },
@@ -182,6 +189,18 @@ fun RecipeEditContent(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f),
                 )
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = form.prepTimeText, onValueChange = { v -> onChange { it.copy(prepTimeText = v.filter(Char::isDigit).take(4)) } },
+                    label = { Text("Подготовка, мин") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f).testTag("prep_time_field"),
+                )
+                OutlinedTextField(
+                    value = form.ovenTempText, onValueChange = { v -> onChange { it.copy(ovenTempText = v.filter(Char::isDigit).take(3)) } },
+                    label = { Text("Духовка, °C") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f).testTag("oven_temp_field"),
+                )
+            }
             Text("Категория", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Category.entries.forEach { c -> FilterChip(form.category == c, { onChange { it.copy(category = c) } }, { Text(c.title) }) }
@@ -190,20 +209,6 @@ fun RecipeEditContent(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Difficulty.entries.forEach { d -> FilterChip(form.difficulty == d, { onChange { it.copy(difficulty = d) } }, { Text(d.title) }) }
             }
-            CuisineField(form.cuisine) { v -> onChange { it.copy(cuisine = v.take(40)) } }
-
-            SectionTitle("Теги")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                tags.forEach { t ->
-                    FilterChip(
-                        selected = t.id in form.tagIds,
-                        onClick = { onChange { f -> f.copy(tagIds = if (t.id in f.tagIds) f.tagIds - t.id else f.tagIds + t.id) } },
-                        label = { Text(t.name) }, leadingIcon = { TagDot(t.colorHint) },
-                    )
-                }
-                FilterChip(false, { newTag = true }, { Text("Новый тег") }, leadingIcon = { Icon(Icons.Filled.Add, null) })
-            }
-
             SectionTitle("Ингредиенты")
             errors.ingredients?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             form.ingredients.forEachIndexed { i, ing ->
@@ -255,6 +260,14 @@ fun RecipeEditContent(
                 value = form.notes, onValueChange = { v -> onChange { it.copy(notes = v.take(4000)) } },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp), placeholder = { Text("Советы, замены, история рецепта…") },
             )
+
+            SectionTitle("Теги")
+            TagMultiSelect(
+                tags = tags,
+                selected = form.tagIds,
+                onToggle = { id -> onChange { f -> f.copy(tagIds = if (id in f.tagIds) f.tagIds - id else f.tagIds + id) } },
+                onCreate = { newTag = true },
+            )
             Spacer(Modifier.height(16.dp))
             Button(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Сохранить рецепт") }
             Spacer(Modifier.height(48.dp))
@@ -283,21 +296,6 @@ fun RecipeEditContent(
 private fun <T> List<T>.swap(a: Int, b: Int): List<T> {
     if (a !in indices || b !in indices) return this
     val m = toMutableList(); val t = m[a]; m[a] = m[b]; m[b] = t; return m
-}
-
-@Composable
-private fun CuisineField(value: String, onChange: (String) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Column {
-        OutlinedTextField(
-            value = value, onValueChange = onChange, label = { Text("Кухня") }, singleLine = true,
-            trailingIcon = { IconButton(onClick = { open = true }) { Icon(Icons.Filled.KeyboardArrowDown, "Список кухонь") } },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        DropdownMenu(open, onDismissRequest = { open = false }) {
-            DEFAULT_CUISINES.forEach { c -> DropdownMenuItem(text = { Text(c.replaceFirstChar { it.uppercase() }) }, onClick = { open = false; onChange(c) }) }
-        }
-    }
 }
 
 @Composable
@@ -399,4 +397,56 @@ fun NewTagDialog(onDismiss: () -> Unit, onCreate: (String, String) -> Unit) {
         confirmButton = { TextButton(onClick = { onCreate(name.trim(), color) }, enabled = name.isNotBlank()) { Text("Создать") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
     )
+}
+
+/**
+ * Multi-select for tags: selected tags are shown as chips with a remove button,
+ * the dropdown lists every existing tag with a checkbox, a new tag is created by a separate action.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagMultiSelect(tags: List<Tag>, selected: Set<Long>, onToggle: (Long) -> Unit, onCreate: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val chosen = tags.filter { it.id in selected }
+    Column(Modifier.fillMaxWidth()) {
+        if (chosen.isEmpty()) {
+            Text("Теги не выбраны", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                chosen.forEach { t ->
+                    InputChip(
+                        selected = true,
+                        onClick = { onToggle(t.id) },
+                        label = { Text(t.name) },
+                        leadingIcon = { TagDot(t.colorHint) },
+                        trailingIcon = { Icon(Icons.Filled.Close, "Убрать тег ${t.name}", Modifier.size(16.dp)) },
+                        modifier = Modifier.testTag("selected_tag_${t.id}"),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box {
+                OutlinedButton(onClick = { open = true }, modifier = Modifier.testTag("tags_dropdown")) {
+                    Text("Выбрать теги"); Spacer(Modifier.width(4.dp)); Icon(Icons.Filled.KeyboardArrowDown, null)
+                }
+                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                    if (tags.isEmpty()) DropdownMenuItem(text = { Text("Тегов пока нет") }, onClick = { open = false }, enabled = false)
+                    tags.forEach { t ->
+                        DropdownMenuItem(
+                            text = { Text(t.name) },
+                            leadingIcon = { Checkbox(checked = t.id in selected, onCheckedChange = null) },
+                            trailingIcon = { TagDot(t.colorHint) },
+                            onClick = { onToggle(t.id) },
+                            modifier = Modifier.testTag("tag_option_${t.id}"),
+                        )
+                    }
+                }
+            }
+            TextButton(onClick = onCreate, modifier = Modifier.testTag("new_tag")) {
+                Icon(Icons.Filled.Add, null); Spacer(Modifier.width(4.dp)); Text("Новый тег")
+            }
+        }
+    }
 }
