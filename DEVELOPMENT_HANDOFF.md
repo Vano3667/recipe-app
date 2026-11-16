@@ -1,8 +1,9 @@
-# DEVELOPMENT_HANDOFF.md
+# DEVELOPMENT HANDOFF
 
 Persistent continuation guide for AI coding agents working on this repository.
 Read this file first, then `AGENT.md` (older notes, Russian; its "commit to main" rule is superseded).
-Last updated: 2026-11-16 22:10 UTC (agent #7 "Jessica").
+Last updated: 2026-11-16 22:35 UTC (agent #8 "Timothy").
+Full text of earlier versions: git history of this file (agent #7 version = `a9c8d61`).
 
 ---
 
@@ -17,7 +18,7 @@ Last updated: 2026-11-16 22:10 UTC (agent #7 "Jessica").
 | Other libs | kotlinx.serialization 1.6.3 (backup JSON, custom colours JSON), Coil 2.6.0 (photos in `filesDir/photos`) |
 | Build | Gradle 8.7 (wrapper NOT committed; CI runs `gradle wrapper --gradle-version 8.7`), JDK 17, minSdk 29, target/compile 34 |
 | applicationId | `com.example.homemenu` (must never change) |
-| Version | `versionCode = 1`, `versionName = "1.0"` |
+| Version | `modernization`: `versionCode = 1`, `versionName = "1.0"`. **PR #4 (`task8-versioning`): `versionCode = 2`, `versionName = "1.1.0"`, `BuildConfig.BUILD_DATE`.** |
 | Signing | No signingConfig. CI builds `assembleDebug` with the runner's random debug key (F2). |
 | CI | `.github/workflows/android.yml`: job `build` (assembleDebug, testDebugUnitTest incl. Robolectric, lintDebug abortOnError) + jobs `instrumented (29, pixel_4)` and `instrumented (34, pixel_tablet)`. Runs on push and on pull_request (two runs per PR commit). ~4 min build, ~10 min instrumented. |
 | Commands (CI) | `./gradlew assembleDebug testDebugUnitTest lintDebug`, `./gradlew connectedDebugAndroidTest` |
@@ -25,59 +26,60 @@ Last updated: 2026-11-16 22:10 UTC (agent #7 "Jessica").
 
 ### Important files (under `app/src/main/java/com/example/homemenu/`)
 - Task 1: `domain/IngredientLineParser.kt`, `ui/recipes/BulkIngredientsDialog.kt`, `ui/recipes/RecipeEditScreen.kt`
+- Task 2: `ui/recipes/RecipeEditScreen.kt` (`TagMultiSelect`), `data/seed/SeedData.kt`, `data/seed/Seeder.kt`
 - Task 3: `ui/menu/MenuScreen.kt`, `ui/menu/MenuViewModel.kt`, `data/repo/Repositories.kt` (MenuRepository)
 - Task 4: `data/files/BackupManager.kt`, `domain/backup/*`, `ui/settings/SettingsViewModel.kt`
 - Task 5: `ui/recipes/RecipeDetailRoute.kt`, `ui/recipes/RecipeDetailScreen.kt`, `domain/RecipeTextParser.kt`, `ui/recipes/RecipeTextImport.kt`, `ui/recipes/TextImportDialog.kt`, `ui/recipes/RecipesScreen.kt`
-- Task 7: `ui/theme/ThemePalettes.kt` (pure), `ui/theme/Theme.kt`, `ui/theme/Color.kt` (legacy schemes, `tagColors`, `TagPalette`), `ui/MainViewModel.kt`, `MainActivity.kt`, `ui/settings/AppearanceViewModel.kt`, `ui/settings/AppearanceSection.kt`, `ui/settings/SettingsScreen.kt`
-- DB: `data/db/AppDatabase.kt`, `data/db/Entities.kt` (`UserSettingsEntity.themeId`, `customColors`), `data/db/DatabaseSafety.kt`
+- Task 7: `ui/theme/ThemePalettes.kt` (pure), `ui/theme/Theme.kt`, `ui/theme/Color.kt`, `ui/MainViewModel.kt`, `MainActivity.kt`, `ui/settings/AppearanceViewModel.kt`, `ui/settings/AppearanceSection.kt`, `ui/settings/SettingsScreen.kt`
+- Task 8: `app/build.gradle.kts`, `ui/settings/SettingsScreen.kt` (About card)
+- DB: `data/db/AppDatabase.kt`, `data/db/Entities.kt`, `data/db/DatabaseSafety.kt`
 
 ### Working rules
 - No local JDK/Gradle/SDK. Code changes go through the GitHub API; **CI is the only build/test environment**.
-- **Per task: feature branch from `modernization` (e.g. `task7-themes`), commits there, draft PR into `modernization`, read its checks, merge only when `build` and both instrumented jobs are green in at least one run on the head commit.** `modernization` -> `main` only via PR #1 after all tasks are verified and migration is tested.
+- **Per task: feature branch from `modernization`, commits there, draft PR into `modernization`, read its checks, merge only when `build` and both instrumented jobs are green in at least one run on the head commit.** `modernization` -> `main` only via PR #1 after all tasks are verified and migration is tested.
 - Docs-only commits: `[skip ci]`. Multi-part changes: intermediate parts `[skip ci]`, last part without it.
 - Never force-push, rewrite history, or commit keystores/passwords/tokens.
-- Tooling: "get file contents" returns only the blob SHA (use it as `sha` for updates). Read bodies from commit diffs (`get_commit` full_patch). `87a602d` = original upload of every file; with `perPage=1, page=N` one file is returned (MainActivity = 11, MainViewModel = 28, MenuScreen = 32, MenuViewModel = 33, AppNav = 34, RecipeDetailScreen = 35, RecipeEditScreen = 36, RecipeViewModels = 37, RecipesScreen = 38, SettingsScreen = 39, SettingsViewModel = 40, Color.kt = 43, Theme.kt = 44). Files rewritten whole by agent #7 (their latest commit = full body): `ThemePalettes.kt` `2d39e8a`, `Theme.kt` `aab7df6`, `MainViewModel.kt` `a12c184`, `MainActivity.kt` `1cadd26`, `AppearanceViewModel.kt` `37cd525`, `AppearanceSection.kt` `8bc9e0d`, `SettingsScreen.kt` `e3dd579`, `ThemePalettesTest.kt` `eca6f24`, this file.
-- Write one file per call; **never write two files of the same branch in parallel** (second write fails with 409).
+- Tooling: "get file contents" returns only the blob SHA. Read bodies from commit diffs (`get_commit` `full_patch`). `87a602d` = original upload of every file; with `perPage=1, page=N` one file is returned (build.gradle.kts = 6, MainActivity = 11, Mappers = 12, Repositories = 18, SeedData = 19, Seeder = 20, Models = 27, MainViewModel = 28, MenuScreen = 32, MenuViewModel = 33, AppNav = 34, RecipeDetailScreen = 35, RecipeEditScreen = 36, RecipeViewModels = 37, RecipesScreen = 38, SettingsScreen = 39, SettingsViewModel = 40, Color.kt = 43, Theme.kt = 44). Reconstruct = original + every later patch (`list_commits` with `path` gives the list). **After each write, check the commit's diff stats: they must show only the intended lines** (agent #8 did this for every file).
+- Files whose full current body is known exactly (agent #8): `SeedData.kt` + `Seeder.kt` @ `3d0ac4e`, `app/build.gradle.kts` @ `2027982`, `SettingsScreen.kt` @ `dafe021` (all on their feature branches).
+- `push_files` can write several files in ONE commit (no 409). Never write two commits to the same branch in parallel.
 - `search_code` (`repo:Vano3667/recipe-app`) returns code fragments but indexes only `main`.
-- **CI visibility:** no Actions tool, but `pull_request_read` method `get_check_runs` on a PR returns the head commit's jobs with status/conclusion (no logs). Logs of a failed job: ask the user to open the job link (Actions tab) and paste the failing step.
+- **CI visibility:** no Actions tool; `pull_request_read` method `get_check_runs` on a PR returns the head commit's jobs with status/conclusion (no logs). Logs of a failed job: ask the user to open the job link and paste the failing step.
 
 ---
 
 ## B. Task checklist
 
 1. [ ] Bulk ingredient input — TESTED (CI green; manual UI check pending)
-2. [ ] Tags redesign + full cuisine removal — IMPLEMENTED (leftover references remain)
+2. [ ] Tags + full cuisine removal — IMPLEMENTED (last code leftover in PR #3, CI pending; README line pending)
 3. [ ] Multiple recipes per meal — TESTED (CI green; manual UI check and migration test pending)
 4. [ ] Complete ZIP and JSON export/import — IMPLEMENTED (round-trip/rollback tests missing)
 5. [ ] Recipe sharing + text import — TESTED (CI green; manual Sharesheet/TXT check pending)
 6. [ ] Fix existing import bug — BLOCKED, WAITING FOR USER FILE
 7. [ ] Six themes + custom colours — TESTED (CI green, merged; hard-coded colour scan + UI test pending)
-8. [ ] Safe APK updates — IN PROGRESS, signing BLOCKED
+8. [ ] Safe APK updates — IN PROGRESS (versioning + build date in PR #4, CI pending), signing BLOCKED
 
-Supporting: migration test on real v1 DB; data preservation; UI consistency; release APK.
+Supporting: migration test on real v1 DB (F4); data preservation; UI consistency; release APK.
 
 ---
 
-## C. Development status
+## C. Development status and technical decisions
 
 Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED. TESTED = CI build + unit + Robolectric + lint + instrumented green; VERIFIED would also need a manual check on a device.
 
-**Global state (2026-11-16 22:10 UTC):**
-- `d34b01d` (= code of `1b8484c`, all work of agents #1-#6): 3 CI runs. `build` green 3/3, API 29 green 3/3, API 34 green 2/3 (one failure, same code: flaky, see F7). **Tasks 1, 3, 5 compile and pass all existing tests.**
-- `2d39e8a` (Task 7 on `task7-themes`): 2 runs. `build` green 2/2, API 29 green 2/2, API 34 green 1/2 (F7 again). Merged into `modernization` as `d71f480` (PR #2).
+**Global state (2026-11-16 22:35 UTC):** `modernization` @ `d71f480` (Task 7 merge) + docs commits. Code of `d34b01d` and `2d39e8a` was green in CI (API 34 flaky, F7). Two open draft PRs by agent #8: #3 (Task 2) and #4 (Task 8), CI running.
 
 ### Task 1 — Bulk ingredient input: TESTED
-- Parser `domain/IngredientLineParser.kt` (`9da0cbc`) + `IngredientLineParserTest` (`0fec6c8`). Dialog `ui/recipes/BulkIngredientsDialog.kt` (`cfbd8d2`, `ab3c0f8`, `7fcf342`): "Вставить списком" (tag `bulk_ingredients`) -> paste (`bulk_input`) -> "Разобрать" (`bulk_parse`) -> editable preview rows, remove (`bulk_remove_i`), "not recognized" / "duplicate" hints, duplicates unchecked -> "Добавить (n)" (`bulk_add_all`). Order preserved. Single-add untouched. `BulkIngredientsTest` (`95cbf59`) green.
+- Parser `domain/IngredientLineParser.kt` (`9da0cbc`) + tests (`0fec6c8`). Dialog `ui/recipes/BulkIngredientsDialog.kt` (`cfbd8d2`, `ab3c0f8`, `7fcf342`): "Вставить списком" -> paste -> "Разобрать" -> editable preview, remove, hints, duplicates unchecked -> "Добавить (n)". Order preserved. Single-add untouched. `BulkIngredientsTest` green.
 - Missing: Robolectric/instrumented test of the dialog; known risk: if `vm.addCustomProduct` fails and never calls back, remaining rows are not added.
 
-### Task 2 — Tags + cuisine removal: IMPLEMENTED (leftovers)
-- Cuisine removed from domain (`047d9e6`), edit state (`5961b4f`), detail (`4328ad3`), edit form (`5be7b4d`). Tags multi-select at bottom, removable chips, separate "new tag" action, case-insensitive dedupe (`aa8edfe`). Legacy DB column `recipes.cuisine` kept and preserved on edit.
-- Code search on `main` found cuisine in: `data/Mappers.kt`, `data/seed/Seeder.kt`, `data/seed/SeedData.kt`, `domain/model/Models.kt` (`DEFAULT_CUISINES`), `ui/recipes/RecipeViewModels.kt`, `ui/recipes/RecipeEditScreen.kt` (`CuisineField`), `ui/recipes/RecipeDetailScreen.kt`, `data/repo/Repositories.kt`, `data/files/BackupManager.kt`, `domain/backup/BackupFormat.kt`, `data/db/Entities.kt`, `BackupJsonTest.kt`. Several are fixed on `modernization`; re-check each there via commit diffs.
-- Missing: remove remaining references (`DEFAULT_CUISINES`, `CuisineField` if still defined, seed data, `RecipeSearch`/`RecipeQuery`, README); keep the DB column and backup v1 read compatibility; tests for tag select/create/remove.
+### Task 2 — Tags + cuisine removal: IMPLEMENTED
+- Earlier: cuisine removed from domain (`047d9e6`, incl. `DEFAULT_CUISINES`), edit state (`5961b4f`), detail (`4328ad3`), edit form (`5be7b4d`, `CuisineField` deleted). Tags multi-select at the bottom (`TagMultiSelect`: removable chips, dropdown with checkboxes, separate "Новый тег"), case-insensitive dedupe (`aa8edfe`).
+- **Agent #8 audit (via commit diffs on `modernization`):** `Models.kt` (no `cuisine`, no `DEFAULT_CUISINES`), `RecipeEditScreen.kt` (no `CuisineField`), `Mappers.kt`, `Seeder.kt` clean. Remaining code trace was `SeedData.SeedRecipe.cuisine` -> removed in `3d0ac4e` on `task2-cuisine-cleanup` (PR #3). Diff: 15 recipe lines + field only.
+- Kept on purpose: DB column `recipes.cuisine` (no table rebuild; existing values preserved) and backup v1 `BackupRecipe.cuisine` (old backups stay readable; `BackupJsonTest` uses it).
+- Missing: README.md line "категория, кухня (готовые варианты и свои)" in "Возможности" (README history: `87a602d`, `717fc83`, `eaea137`); tests for tag select/create/remove.
 
 ### Task 3 — Multiple recipes per meal: TESTED
-- Data (`047d9e6`, `aa8edfe`): `menu_entries.position`, non-unique `(date, slot)` index, addToSlot/replaceRecipe/reorder/move/clear with renumbering; same recipe twice in one meal refused.
-- UI (`4c03f6a`, `2e76d8f`): per dish drag, up/down (`dish_up_<id>`, `dish_down_<id>`), replace (`dish_replace_<id>`), remove (`dish_remove_<id>`, "Убрать блюдо"), servings, cook; "Ещё блюдо" (`slot_add_<date>_<SLOT>`).
+- Data (`047d9e6`, `aa8edfe`): `menu_entries.position`, non-unique `(date, slot)` index, addToSlot/replaceRecipe/reorder/move/clear with renumbering; same recipe twice in one meal refused. UI (`4c03f6a`, `2e76d8f`).
 - Missing: check `MenuGeneratorUseCase` / `ShoppingListUseCase` for one-dish assumptions; tests for dishes()/reorder; migration test (F4).
 
 ### Task 4 — ZIP/JSON export/import: IMPLEMENTED
@@ -85,91 +87,82 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 - Missing: round trip with photos, failed-import rollback test, instrumented import read-back.
 
 ### Task 5 — Sharing + text import: TESTED
-- Share text + Sharesheet + clipboard (`a8b6896`); TXT export (`c5faad8`, `27e4800`); text parser (`1e8f0b8`, tests `ac6bcb7`); import UI (`527450f`, `3bc4e46`, `1b8484c`), tests `RecipeTextImportTest` (`bbc9053`). Entry: Recipes header "Из текста" (`import_text`). Always creates a NEW recipe.
-- Missing / optional: incoming `ACTION_SEND text/plain` intent-filter; pure share formatter + round-trip test; Robolectric test of the dialog. Known limitation: product/tag creation and recipe save are not one transaction.
+- Share text + Sharesheet + clipboard (`a8b6896`); TXT export (`c5faad8`, `27e4800`); text parser (`1e8f0b8`, tests `ac6bcb7`); import UI (`527450f`, `3bc4e46`, `1b8484c`), tests `RecipeTextImportTest` (`bbc9053`). Always creates a NEW recipe.
+- Missing / optional: incoming `ACTION_SEND text/plain` intent-filter; pure share formatter + round-trip test; Robolectric test of the dialog.
 
 ### Task 6 — Existing import bug: BLOCKED — WAITING FOR USER FILE
-- Requested by agents #5, #6, #7. When it arrives: reproduce in a unit test against `BackupManager` staging / `BackupJson.decode`, find root cause, fix, verify DB and photos.
+- Requested by agents #5-#8. When it arrives: reproduce in a unit test against `BackupManager` staging / `BackupJson.decode`, find root cause, fix, verify DB and photos.
 
 ### Task 7 — Themes + custom colours: TESTED (merged `d71f480`)
-- `ui/theme/ThemePalettes.kt` (pure Kotlin): `AppThemeId` = LEGACY (original look, default, follows ThemeMode) + 6 presets LIGHT_MINIMAL "Светлая", WARM_CREAM "Кремовая", NATURAL_GREEN "Зелёная", MODERN_DARK "Тёмная", WARM_TERRACOTTA "Терракотовая", CONTEMPORARY_CONTRAST "Контрастная" + CUSTOM. `ThemePalette` (ARGB Long roles), `CustomRole` (9 roles: background, secondary background, surfaces, cards, buttons+titles = primary, primary accent = primaryContainer, secondary accent, text, secondary text), `CustomAppearance` (base preset + overrides, JSON `{"base":..,"ROLE":"#RRGGBB"}`, tolerant decode), `ColorMath` (WCAG contrast, readable on-colour, blend, hex, HSV), `contrastWarnings`.
-- `Theme.kt`: `HomeMenuTheme(mode, themeId = null, customColors = null, content)`; `ThemePalette.toColorScheme()` fills all M3 roles, every on-colour >= 4.5:1 (falls back to white/near-black); `appIsDark()`; `isAppDark()` now by background luminance (works for all themes).
-- `MainViewModel.appearance` (from `SettingsRepository.observeSettings()`), `MainActivity` applies it, system bar icons follow the theme.
-- `AppearanceViewModel` writes immediately via `SettingsRepository.setAppearance`; custom colours kept when switching themes; `resetToDefault` -> LEGACY; `resetCustom`; `setCustomBase`.
-- `AppearanceSection` (card "Оформление" below "Тема оформления"): preview cards drawn in each theme's colours (tags `theme_card_<ID>`), tap applies; reset button (`appearance_reset`); custom editor (`custom_colors`, `custom_base`, `custom_role_<ROLE>`, `custom_reset`) with contrast warnings; `ColorPickerDialog`: swatches, hue/saturation/brightness sliders (`picker_hue`, `picker_saturation`, `picker_value`), optional HEX (`picker_hex`), `picker_ok`.
-- `SettingsContent` got optional `appearance` slot (null hides the card; `ComposeScreensTest` unchanged).
-- Tests: `ThemePalettesTest` (10 unit tests) green.
-- Missing: scan all screens for hard-coded colours (`Color(0x...)`, `Color.White/Black`, `tagColors(hint, dark)` callers) and switch them to `MaterialTheme.colorScheme`; Robolectric test of AppearanceContent (select theme, picker); manual check on device. Known: on cold start the first frame uses LEGACY until settings load (Eagerly-started StateFlow, short flash possible).
+- See PR #2 and agent #7 version of this file (`a9c8d61`) for the full description. Missing: hard-coded colour scan (`Color(0x...)`, `Color.White/Black`, `tagColors(hint, dark)` callers), Robolectric test of AppearanceContent, manual check.
 
 ### Task 8 — Safe APK updates: IN PROGRESS, signing BLOCKED
-- Done: build number in About (`16c5dfb`). Missing: build date `buildConfigField`, release signing from secrets, versionCode bump, update-over-install test (F2).
+- Done earlier: build number in About (`16c5dfb`).
+- **Agent #8 (PR #4, branch `task8-versioning`):** `2027982` build.gradle.kts: `versionCode` 2, `versionName` "1.1.0", `buildConfigField("String", "BUILD_DATE", ...)` (UTC date at configuration time); `dafe021` About card line "Дата сборки …" (tag `about_build_date`). applicationId/namespace unchanged.
+- Missing: release signing (F2), CI `assembleRelease`, update-over-install test, Room schema export + migration test (F4).
 
-### Supporting — Migration 1->2: IMPLEMENTED (no migration test yet, F4)
-
----
-
-## D. Technical decisions
-
-| Decision | Reason | Commit |
+### Technical decisions (agent #8 additions; earlier table in `a9c8d61`)
+| Decision | Why | Commit |
 |---|---|---|
-| Keep legacy `recipes.cuisine` column | No table rebuild, old data kept | 047d9e6 |
-| Multi-dish meals = several `menu_entries` per (date, slot) by `position` | Additive migration | 047d9e6 |
-| Pre-migration DB byte copy (`DatabaseSafety`) | Safety net | 047d9e6 |
-| Backup v2 ZIP (`recipes.json` + `photos/` + `manifest.json` SHA-256) / JSON with Base64 images | Self-contained; v1 readable | 862a437, 1bec32b |
-| Two-phase import, one transaction, read-back | No partial imports | 1bec32b |
-| Duplicates by normalized recipe name | Ids differ between devices | 862a437 |
-| Theme in DB `user_settings` | Survives updates, in backup | 047d9e6 |
-| `TO_TASTE` amount 0 | "по вкусу" lines | 047d9e6 |
-| Bulk parser pure domain code; unknown lines kept; duplicates only flagged | Testable, no silent data loss | 9da0cbc |
-| New composable params always have defaults | Existing callers/tests compile unchanged | several |
-| Text import as standalone dialog, always a new recipe; TXT UTF-8 with cp1251 fallback | Existing recipes untouched | 527450f, 3bc4e46 |
-| LEGACY stays the default theme; 6 presets added beside it | Existing users see no change after the update | 6c9d3bc |
-| Theme model is pure Kotlin with ARGB Long colours | Unit-testable without Compose/Robolectric | 6c9d3bc |
-| Custom theme = preset base + overrides; on-colours computed, never stored | Text stays readable whatever the user picks; warnings shown | 6c9d3bc |
-| Appearance has its own ViewModel and an optional slot in SettingsContent | No rewrite of SettingsViewModel; tests unaffected | 37cd525, e3dd579 |
-| Appearance card below the light/dark card | `AppFlowsTest.darkThemeCanBeSelected` clicks `theme_DARK` without scrolling | e3dd579 |
-| Feature branch + PR per task; CI read via PR check runs | Connection has PR access but no Actions tool | agent #7 |
-| Pending: signing (F2); versioning proposal versionCode +1 per release, versionName 1.1.0 | — | — |
+| Keep `recipes.cuisine` column and backup v1 field | No destructive migration; old backups import | 3d0ac4e |
+| versionCode +1 per APK given to the user; 1.1.0 for the modernization release | Android refuses updates with a lower/equal code | 2027982 |
+| BUILD_DATE as date only (UTC), not a timestamp | Readable in About; same format on every machine | 2027982 |
+| Separate "Дата сборки" line, existing `about_build` line unchanged | Existing tests keep their tags | dafe021 |
 
 ---
 
-## E. Git history
+## D. Git history
 
 - `main` @ `2ceef75` green (CI #11).
-- Agent #1: `047d9e6`, `aa8edfe`, `862a437`, `1bec32b`. Agent #2: `44d94bf`. Agent #3: `94891a7`, `5961b4f`, `1a764a1`, `4328ad3`, `a8b6896`, `16c5dfb`, `5be7b4d` (CI #17 green). Agent #4: `3c0fac1`, `9da0cbc`, `0fec6c8`, `eb4350c`. Agent #5: `cfbd8d2`, `ab3c0f8`, `95cbf59`, `4c03f6a`, `2e76d8f`, `1f7fe64`. Agent #6: `1e8f0b8`, `ac6bcb7`, `b08eef6`, `c5faad8`, `27e4800`, `7fcf342`, `527450f`, `3bc4e46`, `bbc9053`, `1b8484c`, `5b91fda`.
-- Agent #7 (2026-11-16 21:30-22:10 UTC):
-  - draft PR #1 `modernization` -> `main` (CI tracking, open, do not merge)
-  - `d34b01d` handoff rewrite (no `[skip ci]` on purpose -> first readable CI of agents #5/#6 work: green, API 34 flaky)
-  - branch `task7-themes`: `6c9d3bc` ThemePalettes, `aab7df6` Theme, `a12c184` MainViewModel, `1cadd26` MainActivity, `37cd525` AppearanceViewModel, `8bc9e0d` AppearanceSection, `d7ec590` + `e3dd579` SettingsScreen, `eca6f24` ThemePalettesTest, `2d39e8a` ThemePalettes fix (CI green)
-  - PR #2 `task7-themes` -> `modernization` merged: `d71f480`
-  - this docs commit [skip ci]
+- Agents #1-#7: see `a9c8d61` version of this file (section E there).
+- Agent #8 (2026-11-16 22:20-22:35 UTC):
+  - branch `task2-cuisine-cleanup` from `a9c8d61`: `3d0ac4e` SeedData/Seeder (CI triggered). Draft PR #3 -> `modernization`.
+  - branch `task8-versioning` from `a9c8d61`: `2027982` build.gradle.kts [no skip ci], `dafe021` SettingsScreen (CI triggered). Draft PR #4 -> `modernization`.
+  - this docs commit on `modernization` [skip ci].
+- All pushes verified by the API response and by reading the commit diff back.
+
+---
+
+## E. Testing
+
+- Agents cannot run Gradle; only CI. Last known results: see section C global state.
+- Agent #8 own checks: diff review of every written file (only intended lines changed). **No build or test result for agent #8 commits yet.**
+
+## PENDING TESTS AND CHECKS
+
+| Commit | Branch / PR | Jobs | Started (UTC) | How to read | Status |
+|---|---|---|---|---|---|
+| `3d0ac4e` | `task2-cuisine-cleanup` / PR #3 | build (push run 43970267337, PR run 43970340643), then instrumented 29 + 34 | 22:27 | `pull_request_read` `get_check_runs` pullNumber 3 | PENDING (build in progress at 22:30) |
+| `dafe021` | `task8-versioning` / PR #4 | build + instrumented 29 + 34 | ~22:30 | `pull_request_read` `get_check_runs` pullNumber 4 | PENDING |
+
+Likely failure points: PR #3 — any test that builds `SeedRecipe` positionally or reads `.cuisine` (none found on `main`). PR #4 — a test asserting `versionCode == 1` / "Сборка 1" / "версия 1.0"; Kotlin DSL string escaping of `BUILD_DATE`.
 
 ---
 
 ## F. Blockers and known issues
 
-- **F2 Signing (Task 8, user):** no release key; CI APKs use random debug keys and cannot update each other. If the installed app came from CI, export a backup ZIP first, then reinstall. Plan: permanent keystore in GitHub Secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`), `signingConfigs.release`, CI `assembleRelease`. Waiting: how the current app was installed; does the user have a keystore.
-- **F3 Import bug file (Task 6, user):** waiting for the failing file.
+- **F2 Signing (Task 8, user):** no release key; CI APKs use random debug keys and cannot update each other. If the installed app came from CI, export a backup ZIP first, then reinstall. Plan: keystore in GitHub Secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`), `signingConfigs.release` reading env vars, CI `assembleRelease`. Waiting: how the current app was installed (CI artifact / Android Studio / other) and whether the user has the original keystore. Independent work continues.
+- **F3 Import bug file (Task 6, user):** waiting for the failing file. Independent work continues.
 - **F4 Room schemas not committed:** needed for a 1->2 `MigrationTestHelper` test. Generate v1 schema from `2ceef75` in CI, commit `app/schemas/.../1.json`, add `room-testing`.
 - **F5** `AGENT.md` and `TEST_REPORT.md` outdated.
-- **F7 Flaky instrumented job on API 34 (confirmed):** the same commit failed API 34 in 1 of 3 runs (`d34b01d`) and 1 of 2 runs (`2d39e8a`), while other runs of the same code passed. Earlier seen in CI #18 (`AppFlowsTest.addRecipeWithIngredient`, "product_search" not found, emulator GPU errors). Logs of the new failures not read (no log access). Next step: ask the user for the failing test name from the job log, then harden waits in `AppFlowsTest` (longer timeout / waitUntil on the tablet layout) or add a retry for that job.
-- **F8 resolved:** CI readable via PR check runs (see A).
+- **F7 Flaky instrumented job on API 34 (confirmed):** same commit failed API 34 in 1 of 3 and 1 of 2 runs. Earlier `AppFlowsTest.addRecipeWithIngredient` ("product_search" not found). Next: get failing test name from the job log, harden waits.
 
 ---
 
 ## G. NEXT AGENT — START HERE
 
-1. **State:** `modernization` @ `d71f480` + this docs commit. Tasks 1, 3, 5, 7 TESTED (CI green). Check PR #1 check runs for the merge commit `d71f480` first.
-2. **Next action:** Task 2 leftovers on a new branch `task2-cuisine-cleanup`: grep (via `search_code` on `main` + commit diffs on `modernization`) for `cuisine`, `Cuisine`, `кухн`; remove `DEFAULT_CUISINES`, `CuisineField`, seed `cuisine` usage (keep `RecipeEntity.cuisine` column and backup v1 reading), update README; add tests for tag create/dedupe. PR into `modernization`.
-3. **Then:** Task 7 hard-coded colour scan -> Task 4 round-trip/rollback tests -> F4 migration test -> F7 hardening -> Task 5 optional share intent -> Task 8 (after user answer) -> Task 6 (after user file). Update `TEST_REPORT.md`.
-4. **Files to inspect first:** `domain/model/Models.kt`, `data/seed/SeedData.kt`, `data/seed/Seeder.kt`, `domain/RecipeSearch.kt`, `ui/recipes/RecipeEditScreen.kt` (`87a602d` page 36 + `5be7b4d`, `ab3c0f8`).
-5. **Precautions:** never change `applicationId`; no `fallbackToDestructiveMigration`; keep legacy `cuisine` column; do not merge PR #1 until CI green and migration tested; no secrets in git; one file write at a time per branch.
+1. **State:** `modernization` @ `d71f480` + docs. Open draft PRs: #3 (Task 2 seed cleanup, head `3d0ac4e`), #4 (Task 8 versioning + build date, head `dafe021`). PR #1 stays draft.
+2. **First:** `pull_request_read` `get_check_runs` for PR #3 and PR #4. If `build` + both instrumented green (API 34 may be flaky, F7: green in at least one run), merge each into `modernization` (merge commit, no squash needed). If red: fix on the same branch with a small commit; ask the user for the job log if the cause is not obvious. Update the PENDING table.
+3. **Then:** README cuisine line (Task 2) -> Task 7 hard-coded colour scan -> Task 4 round-trip/rollback tests -> F4 migration test -> F7 hardening -> Task 5 optional share intent -> Task 8 signing (after user answer) -> Task 6 (after user file). Update `TEST_REPORT.md`.
+4. **Precautions:** never change `applicationId`; no `fallbackToDestructiveMigration`; keep legacy `cuisine` column; do not merge PR #1 until CI green and migration tested; no secrets in git; check every write's diff stats.
 
 ---
 
 ## H. MANUAL CHECKS ON A DEVICE (not possible for agents)
 
 - Task 1: Recipe edit -> "Вставить списком" -> paste 5 lines -> preview -> edit one, remove one -> add -> save -> reopen: order and amounts kept.
+- Task 2: Recipe edit -> tags at the very bottom; select several, create one, remove one; no "Кухня" anywhere.
 - Task 3: Menu -> one meal with 3 dishes -> reorder, replace, remove -> restart app -> same list.
-- Task 5: Share -> "Как текст" (Sharesheet), "Скопировать текст", "Сохранить как TXT"; Recipes -> "Из текста" -> paste -> preview -> save; TXT in UTF-8 and windows-1251.
-- Task 7: Settings -> "Оформление" -> each of the 6 themes applies at once on all tabs (recipes, menu, shopping, settings, dialogs); "Свои цвета" -> change background/buttons/text -> restart -> kept; "Вернуть тему по умолчанию"; look for unreadable text or colours that do not change.
+- Task 5: Share -> "Как текст" (Sharesheet), "Скопировать текст", "Сохранить как TXT"; Recipes -> "Из текста" -> paste -> preview -> save.
+- Task 7: Settings -> "Оформление" -> each of the 6 themes applies at once on all tabs; "Свои цвета" -> restart -> kept; reset.
+- Task 8: Settings -> "О приложении" shows версия 1.1.0, Сборка 2, Дата сборки. Update over the installed app only works with the same signing key (F2).
