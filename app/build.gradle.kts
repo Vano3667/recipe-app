@@ -1,3 +1,6 @@
+import java.time.LocalDate
+import java.time.ZoneOffset
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,7 +10,7 @@ plugins {
 }
 
 // Build date shown in Settings > «О приложении». UTC, so every machine produces the same format.
-val buildDate: String = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString()
+val buildDate: String = LocalDate.now(ZoneOffset.UTC).toString()
 
 android {
     namespace = "com.example.homemenu"
