@@ -1,8 +1,8 @@
 # DEVELOPMENT_HANDOFF.md
 
 Persistent continuation guide for AI coding agents working on this repository.
-Read this file first, then `AGENT.md` (older notes from the first agent, in Russian; its "commit to main" rule is superseded below).
-Last updated: 2026-11-17 (session of agent #4 "Billy", recovery + documentation only, no code changed).
+Read this file first, then `AGENT.md` (older notes, Russian; its "commit to main" rule is superseded).
+Last updated: 2026-11-16 15:58 UTC (agent #4 "Billy").
 
 ---
 
@@ -10,42 +10,41 @@ Last updated: 2026-11-17 (session of agent #4 "Billy", recovery + documentation 
 
 | Item | Value |
 |---|---|
-| Project | "Домашнее меню" (Home Menu), offline Android app: recipes, weekly menu, shopping list. UI is Russian only. |
-| Repository | `Vano3667/recipe-app` (private). Default branch `main`. Work branch `modernization`. |
-| Language | Kotlin 1.9.24 |
-| UI | Jetpack Compose (BOM 2024.06.00), Material 3, compose compiler 1.5.14 |
-| Architecture | MVVM, layers `data` / `domain` / `ui`, Hilt 2.51.1 DI, Navigation Compose 2.7.7, Coroutines/Flow |
-| Database | Room 2.6.1 (KSP). DB file `home_menu.db`. Schema version on `modernization`: **2** (main: 1) |
-| Serialization | kotlinx.serialization 1.6.3 (backup JSON) |
-| Images | Coil 2.6.0; photos stored as files in `filesDir/photos`, DB keeps only file names |
-| Build | Gradle 8.7 (wrapper is NOT committed; CI runs `gradle wrapper --gradle-version 8.7`). JDK 17. minSdk 29, target/compile 34 |
-| Application ID / namespace | `com.example.homemenu` (must never change) |
-| Version | `versionCode = 1`, `versionName = "1.0"` (app/build.gradle.kts, unchanged since first upload) |
-| Signing | **No signingConfig in Gradle.** CI only builds `assembleDebug`, signed with the runner's auto-generated debug keystore (see F2, critical). |
-| CI | `.github/workflows/android.yml`: job `build` (assembleDebug, testDebugUnitTest incl. Robolectric UI tests, lintDebug with abortOnError) + job `instrumented` (connectedDebugAndroidTest on emulators API 29 pixel_4 and API 34 pixel_tablet). Artifacts: `home-menu-debug-apk`, `reports`, `instrumented-reports-29/34`. |
-| Other docs | `README.md`, `DESIGN.md`, `TEST_REPORT.md` (last verified results, run #10), `ENVIRONMENT.md`, `CREDITS.md`, `AGENT.md` |
+| Project | "Домашнее меню" (Home Menu), offline Android app: recipes, weekly menu, shopping list. UI Russian only. |
+| Repository | `Vano3667/recipe-app` (private). Default `main`, work branch `modernization`. |
+| Stack | Kotlin 1.9.24, Jetpack Compose (BOM 2024.06.00) + Material 3, MVVM (`data`/`domain`/`ui`), Hilt 2.51.1, Navigation Compose 2.7.7, Coroutines/Flow |
+| Database | Room 2.6.1 (KSP), file `home_menu.db`, schema **v2** on `modernization` (main: v1) |
+| Other libs | kotlinx.serialization 1.6.3 (backup JSON), Coil 2.6.0 (photos in `filesDir/photos`, DB keeps file names) |
+| Build | Gradle 8.7 (wrapper NOT committed; CI runs `gradle wrapper --gradle-version 8.7`), JDK 17, minSdk 29, target/compile 34 |
+| applicationId | `com.example.homemenu` (must never change) |
+| Version | `versionCode = 1`, `versionName = "1.0"` |
+| Signing | No signingConfig. CI builds `assembleDebug` with the runner's random debug key (F2). |
+| CI | `.github/workflows/android.yml`: job `build` (assembleDebug, testDebugUnitTest incl. Robolectric, lintDebug abortOnError) + job `instrumented` (connectedDebugAndroidTest, API 29 pixel_4 and API 34 pixel_tablet). ~4 min build, ~10 min instrumented. |
+| Commands (CI) | `./gradlew assembleDebug testDebugUnitTest lintDebug`, `./gradlew connectedDebugAndroidTest` |
+| Other docs | `README.md`, `DESIGN.md`, `TEST_REPORT.md` (results up to run #10), `ENVIRONMENT.md`, `CREDITS.md`, `AGENT.md` |
 
-### Working rules (apply to every agent)
-- Agents have no local JDK/Gradle/Android SDK. Code is changed through the GitHub API; **CI is the only build and test environment**. After every code push, wait for the workflow run and read its job logs. **If you cannot read CI results, you cannot verify anything (see F6).**
-- Commit to `modernization`, not `main`. Merge to `main` only through a pull request after CI is green.
-- Docs-only commits get `[skip ci]`. Multi-part code changes: intermediate parts `[skip ci]`, last part without it, so CI runs once on the complete change.
-- Never force-push, never rewrite history, never commit keystores, passwords or tokens.
-- Tooling note: the GitHub "get file contents" tool returns only the blob SHA, not the file body (confirmed again by agent #4). Reconstruct file bodies from commit diffs (`get_commit` with `full_patch`; upload commit `87a602d` contains every original file in full; later commits contain the diffs). Large single-file writes may be rejected: split big files.
+### Working rules
+- No local JDK/Gradle/SDK. Code changes go through the GitHub API; **CI is the only build/test environment**. After each code push, wait for the run and read job logs.
+- Commit to `modernization`; merge to `main` only via PR after CI is green.
+- Docs-only commits: `[skip ci]`. Multi-part changes: intermediate parts `[skip ci]`, last part without it.
+- Never force-push, rewrite history, or commit keystores/passwords/tokens.
+- Tooling: "get file contents" returns only the blob SHA (use it as `sha` for updates). Read bodies from commit diffs (`get_commit` full_patch; `87a602d` = original upload of every file). `push_files` with 2 files of ~13 KB timed out: write one file per commit.
+- Agent #4 credential: Actions READ works (runs, jobs, logs). Re-running jobs = 403, listing PRs = 403. To re-run a flaky job, push a new commit or ask the user.
 
 ---
 
-## B. Original task specification (checklist)
+## B. Task checklist
 
-1. [ ] Bulk ingredient input (paste many lines, parse name/amount/unit, keep order, edit/delete each, keep single-add, prevent duplicates)
-2. [ ] Tags redesign (multi-select at bottom of recipe form, create via separate action, dedupe) and complete removal of cuisine classification
-3. [ ] Multiple recipes per meal (breakfast/lunch/dinner/snack; add, remove, replace, reorder; safe migration)
-4. [ ] Complete ZIP and JSON export/import (all data, images, manifest, version; validate, preview, duplicates Skip/Update/Separate, transactional, verify, report)
-5. [ ] Recipe sharing (readable text: clipboard, Sharesheet, TXT) and text-based recipe import with editable preview
-6. [ ] Fix the existing import bug (requires the user's original failing file)
-7. [ ] Six predefined themes + custom colors (Settings > Appearance, persistent, contrast, reset)
-8. [ ] Safe APK updates (same applicationId, same signing key, versionCode increments, data preserved, Settings > About)
+1. [ ] Bulk ingredient input
+2. [ ] Tags redesign + full cuisine removal
+3. [ ] Multiple recipes per meal
+4. [ ] Complete ZIP and JSON export/import
+5. [ ] Recipe sharing + text import
+6. [ ] Fix existing import bug (needs user file)
+7. [ ] Six themes + custom colors
+8. [ ] Safe APK updates
 
-Supporting: DB migration tested against a real v1 DB; data preservation across updates; UI consistency; tests (unit, Robolectric, instrumented, migration, import/export); release APK.
+Supporting: migration test on real v1 DB; data preservation; UI consistency; tests; release APK.
 
 ---
 
@@ -53,42 +52,38 @@ Supporting: DB migration tested against a real v1 DB; data preservation across u
 
 Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 
-**Global state:** `modernization` @ `5be7b4d` contains agent #3's compile fix for the main sources (7 commits, see E). Its CI result is **UNKNOWN** to agent #4 (F6). Test sources other than `BackupJsonTest.kt` were NOT updated and may still reference removed APIs (`cuisine`, `ImportResult`, `exportTo`, `importFrom`, `MenuDao.upsert/find`), so `testDebugUnitTest` / `connectedDebugAndroidTest` may fail even if `assembleDebug` passes. Nothing on `modernization` is verified. `main` @ `2ceef75` is the last verified version.
+**Global state:** `modernization` compiles and passes unit + Robolectric + lint (CI #17 on `5be7b4d`: all jobs green incl. instrumented API 29 and 34; CI #18 on `0fec6c8`: build job green, API 29 green, API 34 one UI test failed, see F7).
 
-### Task 1 — Bulk ingredient input: IN PROGRESS (groundwork only)
-- Done: `MeasureUnit.TO_TASTE` ("по вкусу", stored as 0); case-insensitive product dedupe + bulk product lookup (`aa8edfe`).
-- Missing: pure parser `domain/IngredientLineParser.kt` + unit tests, bulk-paste dialog with editable preview in `RecipeEditScreen.kt`, duplicate protection.
+### Task 1 — Bulk ingredient input: IN PROGRESS
+- TESTED: `domain/IngredientLineParser.kt` (`9da0cbc`) + `IngredientLineParserTest` 9 tests (`0fec6c8`, green in CI #18). Handles leading/trailing amounts, fractions, ranges (upper bound), unicode fractions, RU/EN unit synonyms, kg/l -> g/ml, "по вкусу" -> TO_TASTE, bullets/numbering; unknown lines kept whole (`recognized=false`); `duplicateIndices()` flags repeats in paste and vs existing names.
+- Missing: bulk-paste dialog in `ui/recipes/RecipeEditScreen.kt` (paste -> preview list with editable name/amount/unit, delete row, duplicate marker -> "Add all"), mapping to the edit form's ingredient rows (products resolved by name via repository bulk lookup from `aa8edfe`), Robolectric test.
 
-### Task 2 — Tags + cuisine removal: IMPLEMENTED (unverified)
-- Done: cuisine removed from domain (`047d9e6`), edit-state (`5961b4f`), detail screen (`4328ad3`), edit form (`5be7b4d`). Tags multi-select dropdown with checkboxes at the bottom of the form, selected tags as removable chips, separate "new tag" action; dedupe in `RecipeRepository.addTag` (`5be7b4d`). DB column `recipes.cuisine` kept as legacy.
-- To check: `domain/RecipeSearch.kt`, `ui/recipes/RecipesScreen.kt`, `SettingsScreen.kt`, seed data and all tests for remaining cuisine references; grep the whole tree (via diffs) for `cuisine`/`кухн`.
+### Task 2 — Tags + cuisine removal: IMPLEMENTED
+- Cuisine removed from domain (`047d9e6`), edit state (`5961b4f`), detail (`4328ad3`), edit form (`5be7b4d`). Tags multi-select at bottom, removable chips, separate "new tag" action, case-insensitive dedupe. Legacy DB column `recipes.cuisine` kept. Compiles and existing tests pass (CI #17).
+- Missing: grep remaining `cuisine`/`кухн` references (RecipeSearch, RecipesScreen filters, seed, tests), tests for tag select/create/remove.
 
 ### Task 3 — Multiple recipes per meal: IN PROGRESS (data layer only)
-- Done (`047d9e6`, `aa8edfe`): `menu_entries.position`, non-unique `(date, slot)` index, DAO + repository add/replace/reorder/move.
-- Missing: multi-dish UI in `ui/menu/MenuScreen.kt` / `MenuViewModel.kt`; check `MenuGeneratorUseCase` and `ShoppingListUseCase` for one-dish assumptions; tests; migration test.
+- Done: `menu_entries.position`, non-unique `(date, slot)` index, DAO/repository add/replace/reorder/move.
+- Missing: multi-dish UI in `ui/menu/MenuScreen.kt`/`MenuViewModel.kt`; check `MenuGeneratorUseCase`, `ShoppingListUseCase`; tests; migration test.
 
-### Task 4 — ZIP/JSON export/import: IMPLEMENTED (unverified)
-- Data layer (`862a437`, `1bec32b`): backup format v2 (manifest, SHA-256, Base64 images in JSON, v1 readable), `BackupAnalyzer`, `BackupManager.exportZip/exportJson/stage/commit/discard` (one transaction, photo rollback, read-back verification).
-- UI (`94891a7` SettingsViewModel, `16c5dfb` SettingsScreen): export ZIP and JSON, staged import with preview, duplicate mode, report, discard on cancel.
-- Tests: `BackupJsonTest` updated for v2 fields, multi-dish menu, legacy v1 cuisine file (`1a764a1`). Missing: round trip with photos, failed-import rollback test, instrumented import with DB read-back.
+### Task 4 — ZIP/JSON export/import: IMPLEMENTED
+- Format v2, staged import with preview/duplicate modes/single transaction/read-back (`862a437`, `1bec32b`); Settings UI (`94891a7`, `16c5dfb`); `BackupJsonTest` v2 (`1a764a1`). Compiles, tests pass.
+- Missing: round trip with photos, failed-import rollback test, instrumented import read-back.
 
 ### Task 5 — Sharing + text import: IN PROGRESS
-- Done (`a8b6896`): `ui/recipes/RecipeDetailRoute.kt` with readable share text (description, prep time, oven temp, tags, kcal) and copy to clipboard. Existing: single-recipe `.zip` share via FileProvider, `writeText` helper.
-- Missing: confirm Sharesheet `ACTION_SEND text/plain`, TXT export via `CreateDocument`, text recipe parser + editable preview, TXT file import, incoming share intent (optional), tests. Move share-text formatting into a pure domain function for unit tests.
+- Done: readable share text + clipboard in `ui/recipes/RecipeDetailRoute.kt` (`a8b6896`).
+- Missing: Sharesheet `ACTION_SEND text/plain` check, TXT export, pure share formatter + tests, text recipe parser (reuse `IngredientLineParser` for the ingredient section) + editable preview, TXT import.
 
 ### Task 6 — Existing import bug: BLOCKED — WAITING FOR USER FILE
-- Original failing file not provided. Do not report as fixed. When it arrives: reproduce in a unit test against `BackupManager.stageStream` / `BackupJson.decode`, find root cause, fix, verify DB persistence and photos.
 
-### Task 7 — Six themes + custom colors: IN PROGRESS (storage only)
-- Done (`047d9e6`): `user_settings.themeId` (default `LEGACY`), `user_settings.customColors` (JSON), included in backup v2.
-- Missing: `AppThemeId` enum + 6 palettes, theme provider in `Theme.kt`/`MainActivity.kt`, Settings > Appearance with previews, color picker, contrast check, reset, tests. Keep existing `ThemeMode` and test `darkThemeCanBeSelected` working.
+### Task 7 — Themes + custom colors: IN PROGRESS (storage only)
+- Done: `user_settings.themeId` (default LEGACY), `customColors` JSON, in backup v2.
+- Missing: 6 palettes, provider, Settings > Appearance, picker, contrast, reset, tests.
 
-### Task 8 — Safe APK updates: IN PROGRESS (About only), signing BLOCKED
-- Done (`16c5dfb`): build number shown in About (verify it uses BuildConfig, and add build date via a `buildConfigField`).
-- Missing: release signingConfig from CI secrets / git-ignored `keystore.properties`, release job, versionCode/versionName bump, update-over-install test. See F2.
+### Task 8 — Safe APK updates: IN PROGRESS, signing BLOCKED
+- Done: build number in About (`16c5dfb`). Missing: build date field, release signing from secrets, versionCode bump, update-over-install test (F2).
 
-### Supporting — DB migration 1->2: IMPLEMENTED (unverified)
-- `MIGRATION_1_2` additive only; no destructive fallback; `DatabaseSafety.kt` copies DB to `filesDir/db_backups` before upgrade. Risk: `app/schemas/` not committed, no `MigrationTestHelper` test (F4).
+### Supporting — Migration 1->2: IMPLEMENTED (no migration test yet, F4)
 
 ---
 
@@ -96,75 +91,46 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 
 | Decision | Reason | Commit |
 |---|---|---|
-| Keep legacy `recipes.cuisine` column, remove cuisine only from domain/UI | No table rebuild; old data recoverable | 047d9e6 |
-| Multi-dish meals = several `menu_entries` rows per (date, slot) ordered by `position` | Additive migration; old meals become one dish at position 0 | 047d9e6 |
-| No FK menu_entries -> recipes | Inherited design | original |
-| Pre-migration byte copy of the DB | Safety net if a migration fails | 047d9e6 |
-| Backup v2: ZIP = `recipes.json` + `photos/` + `manifest.json` (SHA-256); JSON = same + Base64 `images` | Self-contained, integrity-checked; v1 still readable | 862a437, 1bec32b |
-| Two-phase import: stage -> preview -> commit in one transaction -> read-back | No partial imports, no silent overwrite | 1bec32b |
-| Duplicate detection by normalized recipe name | Ids differ between devices | 862a437 |
-| Imported photos get new UUID names | Never overwrite device photos | original |
-| Theme stored in DB `user_settings` | Survives updates, included in backup | 047d9e6 |
-| `TO_TASTE` unit stored with amount 0 | "по вкусу" lines from bulk/text import | 047d9e6 |
-| Recipe detail split into `RecipeDetailScreen.kt` (content) + `RecipeDetailRoute.kt` (route, share, delete dialog) | GitHub API rejects large single-file writes | 4328ad3, a8b6896 |
-| Pending: signing | Needs user input (F2) | — |
-| Pending: versioning | Proposal: `versionCode` +1 per release; `versionName` 1.0 -> 1.1.0 for the modernization release | — |
+| Keep legacy `recipes.cuisine` column | No table rebuild, old data kept | 047d9e6 |
+| Multi-dish meals = several `menu_entries` per (date, slot) by `position` | Additive migration | 047d9e6 |
+| Pre-migration DB byte copy (`DatabaseSafety`) | Safety net | 047d9e6 |
+| Backup v2 ZIP (`recipes.json` + `photos/` + `manifest.json` SHA-256) / JSON with Base64 images | Self-contained; v1 readable | 862a437, 1bec32b |
+| Two-phase import, one transaction, read-back | No partial imports | 1bec32b |
+| Duplicates by normalized recipe name | Ids differ between devices | 862a437 |
+| Theme in DB `user_settings` | Survives updates, in backup | 047d9e6 |
+| `TO_TASTE` amount 0 | "по вкусу" lines | 047d9e6 |
+| Detail screen split into Screen + Route files | API rejects large writes | 4328ad3, a8b6896 |
+| Bulk parser is pure domain code; number without unit = pieces; kg/l converted; range keeps upper bound; unknown lines kept, never dropped; duplicates only flagged | Testable without Android; no silent data loss | 9da0cbc |
+| Pending: signing (F2); versioning proposal versionCode +1 per release, versionName 1.1.0 | — | — |
 
 ---
 
-## E. Git history and recovery point
+## E. Git history
 
-- Last verified commit: `2ceef75` on `main` (CI #11 green; #12 green on modernization at the same code).
-- `modernization` head before this docs commit: `5be7b4d`.
-- Agent #1 (2026-11-16, interrupted): `047d9e6` data v2 + migration, `aa8edfe` repositories, `862a437` backup format v2, `1bec32b` BackupManager — CI #13–#16 failed at `compileDebugKotlin`.
-- Agent #2: `44d94bf` this handoff file (docs only).
-- Agent #3 (2026-11-16, compile fix, did not update this file):
-  - `94891a7` SettingsViewModel: exportZip/exportJson, stage -> confirm(DuplicateMode) -> commit -> ImportReport, discard
-  - `5961b4f` RecipeViewModels: cuisine dropped from edit state, v2 fields carried through
-  - `1a764a1` BackupJsonTest: v2 fields, multi-dish menu, legacy v1 cuisine file
-  - `4328ad3` RecipeDetailScreen: content without cuisine; description, prep, oven, copy action
-  - `a8b6896` RecipeDetailRoute.kt (new): route, readable share text, clipboard, delete dialog
-  - `16c5dfb` SettingsScreen: staged import UI, ZIP + JSON export, build number in About
-  - `5be7b4d` RecipeEditScreen: no cuisine, v2 fields, tags multi-select at bottom — **CI triggered, result unknown to agent #4**
-- Agent #4 (2026-11-17): this docs commit only.
-- Open pull requests: unknown (agent #4 credential cannot list PRs).
-- Latest built APK: debug artifact of CI #11/#12 (`2ceef75`, versionCode 1, ephemeral debug key). No release APK ever built.
+- Last fully green: `5be7b4d` (CI #17, all jobs). `main` @ `2ceef75` green (CI #11).
+- Agent #1: `047d9e6`, `aa8edfe`, `862a437`, `1bec32b` (data layer; CI #13–#16 failed compile).
+- Agent #2: `44d94bf` handoff.
+- Agent #3: `94891a7`, `5961b4f`, `1a764a1`, `4328ad3`, `a8b6896`, `16c5dfb`, `5be7b4d` (compile fix + UI; CI #17 green).
+- Agent #4: `3c0fac1` handoff, `9da0cbc` parser, `0fec6c8` parser tests (CI #18: build green, API 29 green, API 34 F7), this docs commit.
+- All pushes verified by the API response (new branch head SHA).
 
 ---
 
-## F. Known issues and blockers
+## F. Blockers and known issues
 
-### F1. Compile state of `modernization`
-Agent #3 addressed every error listed for CI #16 (RecipeDetailScreen, RecipeEditScreen, RecipeViewModels, SettingsViewModel). Result of the CI run on `5be7b4d` not yet read. Test sources still to update: `app/src/test/.../Fixtures.kt`, `ui/LogicTest.kt`, `ui/ComposeScreensTest.kt`, `app/src/androidTest/.../AppFlowsTest.kt`.
-
-### F2. APK signing — CRITICAL for Task 8 (BLOCKED, needs user)
-- No release signing config; every CI APK is signed with a new random debug key, so CI APKs normally cannot be installed over each other.
-- If the installed app came from a CI artifact, its key is lost: one-time uninstall/reinstall is unavoidable. **Before that, export a backup ZIP from the installed app**, then reinstall and import.
-- Plan: one permanent release keystore held by the user, stored only as GitHub Secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`); `signingConfigs.release` reads env / git-ignored `keystore.properties`; CI job `assembleRelease`.
-- Awaiting user: how the current app was installed, and whether they hold a keystore.
-
-### F3. Import bug file — BLOCKED (Task 6)
-Waiting for the user's original file that fails to import.
-
-### F4. Room schemas not committed
-`app/schemas/` missing; needed for a 1->2 `MigrationTestHelper` test. Generate v1 schema from `2ceef75` in CI (upload as artifact), commit `app/schemas/com.example.homemenu.data.db.AppDatabase/1.json`, add `room-testing` and androidTest assets srcDir.
-
-### F5. `AGENT.md` outdated (describes 2026-11-11). This file supersedes it.
-
-### F6. CI results not readable — BLOCKS ALL VERIFICATION (new, agent #4)
-- The GitHub connection used by agent #4 returns `403 Resource not accessible by personal access token` for Actions (workflow runs, job logs) and Pull requests. Contents and commits are readable.
-- Effect: the CI result of `5be7b4d` is unknown, and no further code change can be verified. Pushing more code blind on top of an unknown compile state risks stacking errors.
-- Unblock: give the token behind the GitHub connection these repository permissions for `Vano3667/recipe-app`: **Actions: Read**, **Pull requests: Read and write**, **Commit statuses: Read** (plus existing Contents: Read and write, Metadata: Read). Then reconnect GitHub in the agent. Alternative: the user pastes the failing step log of the latest CI run.
-- Independent work possible meanwhile: pure, self-contained domain code with unit tests (e.g. `IngredientLineParser`), pushed with `[skip ci]` and verified once CI is readable.
+- **F2 Signing (Task 8, user):** no release key; CI APKs use random debug keys and cannot update each other. If the installed app came from CI, export a backup ZIP first, then reinstall. Plan: permanent keystore in GitHub Secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`), `signingConfigs.release`, CI `assembleRelease`. Waiting: how the current app was installed; does the user have a keystore.
+- **F3 Import bug file (Task 6, user):** waiting for the failing file.
+- **F4 Room schemas not committed:** needed for a 1->2 `MigrationTestHelper` test. Generate v1 schema from `2ceef75` in CI, commit `app/schemas/.../1.json`, add `room-testing`.
+- **F5** `AGENT.md` outdated; this file supersedes it.
+- **F6 resolved:** CI logs are readable now. Re-run and PR endpoints still 403.
+- **F7 Flaky instrumented test on API 34:** CI #18 `AppFlowsTest.addRecipeWithIngredient` failed on pixel_tablet API 34 ("Не появился элемент с тегом «product_search» за 15000 мс", AppFlowsTest.kt:51), with emulator GPU errors ("Failed to find ColorBuffer"). The same test passed on API 29 in #18 and on both APIs in #17, and #18 changed no app code (only a pure domain file + unit test). Likely emulator flakiness, NOT proven. Check the next run; if it fails again, inspect AppFlowsTest waits and the product search field on the tablet layout.
 
 ---
 
 ## G. NEXT AGENT — START HERE
 
-1. **Verified state:** `main` @ `2ceef75` builds and passes all tests. `modernization` (head = this docs commit, code head `5be7b4d`) has data-layer work for tasks 2/3/4/7, migration 1->2, and agent #3's UI compile fix. **Nothing on `modernization` is verified.**
-2. **First action:** confirm you can read GitHub Actions (list workflow runs for branch `modernization`). If you get 403, F6 still applies: ask the user to grant Actions/PR read, do not push untested UI code.
-3. **Then:** read the CI run for `5be7b4d` (`get_job_logs` with `failed_only`). Fix compile errors first, then test-source errors (F1 list), until job `build` and job `instrumented` are green. Update `TEST_REPORT.md`.
-4. **Then, in order:** F4 migration test -> Task 3 multi-dish UI -> Task 1 bulk ingredients (parser + dialog) -> Task 2 leftover cuisine grep -> Task 4 round-trip/rollback tests -> Task 5 Sharesheet/TXT/text import -> Task 7 themes -> Task 8 signing (after user answer) -> Task 6 (after user file).
-5. **Files to inspect first:** `ui/recipes/RecipeEditScreen.kt`, `ui/recipes/RecipeDetailRoute.kt`, `ui/settings/SettingsScreen.kt`, `ui/settings/SettingsViewModel.kt`, `ui/menu/MenuScreen.kt`, `ui/menu/MenuViewModel.kt`, `domain/RecipeSearch.kt`, all files under `app/src/test` and `app/src/androidTest`.
-6. **Blockers:** F6 (CI visibility), F2 (signing, user), F3 (import file, user).
-7. **Precautions:** never change `applicationId`; never add `fallbackToDestructiveMigration`; keep legacy `cuisine` column; do not merge into `main` until CI is green and migration 1->2 is tested on a real v1 DB; never commit keystores, passwords or tokens.
+1. **State:** `modernization` builds and passes unit/Robolectric/lint. Last fully green commit `5be7b4d`. Latest code commit `0fec6c8`.
+2. **First:** read the latest CI run on `modernization`; confirm F7 does not repeat.
+3. **Next action:** Task 1 UI. Reconstruct `ui/recipes/RecipeEditScreen.kt` from `87a602d` + diffs `5be7b4d` (and `RecipeViewModels.kt` from `87a602d` + `5961b4f`). Add a "Вставить списком" button next to single add, a new file `ui/recipes/BulkIngredientsDialog.kt` (keep files small), and a ViewModel function that appends parsed rows in order. Add a Robolectric test.
+4. **Then:** Task 3 multi-dish UI -> F4 migration test -> Task 2 leftovers -> Task 4 tests -> Task 5 -> Task 7 -> Task 8 (after user answer) -> Task 6 (after user file).
+5. **Precautions:** never change `applicationId`; no `fallbackToDestructiveMigration`; keep legacy `cuisine` column; no merge to `main` until CI green and migration tested; no secrets in git.
