@@ -105,7 +105,6 @@ data class EditForm(
     val timeText: String = "",
     val difficulty: Difficulty = Difficulty.EASY,
     val category: Category = Category.DINNER,
-    val cuisine: String = "",
     val caloriesText: String = "",
     val servingsText: String = "2",
     val ingredients: List<EditIngredient> = emptyList(),
@@ -113,6 +112,10 @@ data class EditForm(
     val notes: String = "",
     val tagIds: Set<Long> = emptySet(),
     val createdAt: Long = 0,
+    // v2 fields; kept in the form so editing a recipe never drops them.
+    val description: String = "",
+    val prepTimeText: String = "",
+    val ovenTempText: String = "",
 )
 
 data class EditErrors(val name: String? = null, val servings: String? = null, val ingredients: String? = null, val time: String? = null) {
@@ -125,7 +128,7 @@ object RecipeFormValidator {
     fun validate(f: EditForm): EditErrors = EditErrors(
         name = if (f.name.isBlank()) "Введите название" else null,
         servings = f.servingsText.trim().toIntOrNull().let { if (it == null || it <= 0) "Порций должно быть больше 0" else null },
-        ingredients = if (f.ingredients.any { (parseAmount(it.amountText) ?: 0.0) <= 0.0 }) "Количество каждого ингредиента должно быть больше 0" else null,
+        ingredients = if (f.ingredients.any { !it.unit.isAmountless && (parseAmount(it.amountText) ?: 0.0) <= 0.0 }) "Количество каждого ингредиента должно быть больше 0" else null,
         time = f.timeText.trim().takeIf { it.isNotEmpty() }?.toIntOrNull().let { t ->
             if (f.timeText.isNotBlank() && (t == null || t < 0)) "Неверное время" else null
         },
@@ -138,22 +141,26 @@ object RecipeFormValidator {
         cookingTimeMin = f.timeText.trim().toIntOrNull() ?: 0,
         difficulty = f.difficulty,
         category = f.category,
-        cuisine = f.cuisine.trim(),
         calories = f.caloriesText.trim().toIntOrNull()?.takeIf { it >= 0 },
         servings = f.servingsText.trim().toInt(),
-        ingredients = f.ingredients.map { Ingredient(it.product, parseAmount(it.amountText)!!, it.unit) },
+        ingredients = f.ingredients.map { Ingredient(it.product, if (it.unit.isAmountless) 0.0 else parseAmount(it.amountText)!!, it.unit) },
         steps = f.steps,
         notes = f.notes,
         tags = tags.filter { it.id in f.tagIds },
         createdAt = f.createdAt,
+        description = f.description.trim(),
+        prepTimeMin = f.prepTimeText.trim().toIntOrNull()?.coerceAtLeast(0) ?: 0,
+        ovenTempC = f.ovenTempText.trim().toIntOrNull()?.takeIf { it > 0 },
     )
 
     fun fromRecipe(r: Recipe) = EditForm(
         id = r.id, name = r.name, photoFile = r.photoFile, timeText = r.cookingTimeMin.takeIf { it > 0 }?.toString() ?: "",
-        difficulty = r.difficulty, category = r.category, cuisine = r.cuisine, caloriesText = r.calories?.toString() ?: "",
+        difficulty = r.difficulty, category = r.category, caloriesText = r.calories?.toString() ?: "",
         servingsText = r.servings.toString(),
-        ingredients = r.ingredients.map { EditIngredient(it.product, formatAmount(it.amount), it.unit) },
+        ingredients = r.ingredients.map { EditIngredient(it.product, if (it.unit.isAmountless) "" else formatAmount(it.amount), it.unit) },
         steps = r.steps.ifEmpty { listOf(Step("")) }, notes = r.notes, tagIds = r.tags.map { it.id }.toSet(), createdAt = r.createdAt,
+        description = r.description, prepTimeText = r.prepTimeMin.takeIf { it > 0 }?.toString() ?: "",
+        ovenTempText = r.ovenTempC?.toString() ?: "",
     )
 
     fun formatAmount(a: Double): String = if (a == Math.floor(a)) a.toLong().toString() else a.toString().replace('.', ',')
