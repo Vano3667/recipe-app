@@ -8,7 +8,18 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-const val BACKUP_FORMAT_VERSION = 1
+/**
+ * Backup format (documented in BACKUP_FORMAT.md).
+ *  v1 — app 1.0: zip with recipes.json + photos/.
+ *  v2 — app 1.1: + manifest.json with SHA-256 of every file, recipe description / prep time / oven temperature,
+ *       dish order inside a meal, appearance settings, optional Base64 images for the standalone JSON export.
+ * The reader accepts every version from 1 to [BACKUP_FORMAT_VERSION].
+ */
+const val BACKUP_FORMAT_VERSION = 2
+const val BACKUP_FORMAT_ID = "home-menu-backup"
+const val BACKUP_DATA_FILE = "recipes.json"
+const val BACKUP_MANIFEST_FILE = "manifest.json"
+const val BACKUP_PHOTOS_DIR = "photos/"
 
 class IncompatibleBackupException(message: String) : Exception(message)
 
@@ -23,6 +34,7 @@ data class BackupProduct(
 @Serializable
 data class BackupTag(val name: String, val color: String, val custom: Boolean = true)
 
+/** Ingredient order = order in the list. */
 @Serializable
 data class BackupIngredient(
     val product: String,
@@ -32,6 +44,7 @@ data class BackupIngredient(
     val unit: String,
 )
 
+/** [photo] is a file name inside photos/ (zip) or a key of [BackupData.images] (json), never a device path. */
 @Serializable
 data class BackupStep(val text: String, val photo: String? = null)
 
@@ -39,11 +52,13 @@ data class BackupStep(val text: String, val photo: String? = null)
 data class BackupRecipe(
     val id: Long,
     val name: String,
+    val description: String = "",
     val photo: String? = null,
     val cookingTimeMin: Int = 0,
+    val prepTimeMin: Int = 0,
+    val ovenTempC: Int? = null,
     val difficulty: String = "EASY",
     val category: String = "DINNER",
-    val cuisine: String = "",
     val calories: Int? = null,
     val servings: Int = 1,
     val ingredients: List<BackupIngredient> = emptyList(),
@@ -53,27 +68,53 @@ data class BackupRecipe(
     val createdAt: Long = 0L,
 )
 
+/** One dish of a meal; [recipeId] refers to [BackupRecipe.id] inside the same file. */
 @Serializable
 data class BackupMenuEntry(
     val date: String,
     val slot: String,
     val recipeId: Long,
     val servings: Int,
+    val position: Int = 0,
 )
 
 @Serializable
-data class BackupSettings(val themeMode: String = "SYSTEM")
+data class BackupSettings(
+    val themeMode: String = "SYSTEM",
+    val themeId: String? = null,
+    val customColors: String? = null,
+)
 
 @Serializable
 data class BackupData(
     @SerialName("formatVersion") val version: Int = BACKUP_FORMAT_VERSION,
+    val format: String = BACKUP_FORMAT_ID,
     val app: String = "HomeMenu",
+    val appVersion: String = "",
     val exportedAt: Long = 0L,
     val products: List<BackupProduct> = emptyList(),
     val tags: List<BackupTag> = emptyList(),
     val recipes: List<BackupRecipe> = emptyList(),
     val menu: List<BackupMenuEntry> = emptyList(),
     val settings: BackupSettings? = null,
+    /** Standalone JSON export only: photo file name → Base64 image. Empty inside a zip (photos live in photos/). */
+    val images: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class ManifestFile(val path: String, val size: Long, val sha256: String)
+
+@Serializable
+data class BackupManifest(
+    val format: String = BACKUP_FORMAT_ID,
+    val formatVersion: Int = BACKUP_FORMAT_VERSION,
+    val app: String = "HomeMenu",
+    val appVersion: String = "",
+    val exportedAt: Long = 0L,
+    val recipes: Int = 0,
+    val menuEntries: Int = 0,
+    val photos: Int = 0,
+    val files: List<ManifestFile> = emptyList(),
 )
 
 object BackupJson {
@@ -86,12 +127,20 @@ object BackupJson {
 
     fun encode(data: BackupData): String = json.encodeToString(BackupData.serializer(), data)
 
+    fun encodeManifest(m: BackupManifest): String = json.encodeToString(BackupManifest.serializer(), m)
+
+    fun decodeManifest(text: String): BackupManifest = try {
+        json.decodeFromString(BackupManifest.serializer(), text)
+    } catch (e: Exception) {
+        throw IncompatibleBackupException("Файл manifest.json повреждён")
+    }
+
     /** Throws [IncompatibleBackupException] for unknown/newer versions or malformed JSON. */
     fun decode(text: String): BackupData {
         val version = try {
             json.parseToJsonElement(text).jsonObject["formatVersion"]?.jsonPrimitive?.int
         } catch (e: Exception) {
-            throw IncompatibleBackupException("Файл recipes.json повреждён или не является резервной копией")
+            throw IncompatibleBackupException("Файл повреждён или не является резервной копией «Домашнего меню»")
         } ?: throw IncompatibleBackupException("В резервной копии не указана версия формата")
         if (version < 1 || version > BACKUP_FORMAT_VERSION) {
             throw IncompatibleBackupException("Версия резервной копии ($version) не поддерживается")
