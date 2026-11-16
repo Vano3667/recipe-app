@@ -2,7 +2,7 @@
 
 Persistent continuation guide for AI coding agents working on this repository.
 Read this file first, then `AGENT.md` (older notes, Russian; its "commit to main" rule is superseded).
-Last updated: 2026-11-16 22:35 UTC (agent #8 "Timothy").
+Last updated: 2026-11-16 23:08 UTC (agent #8 "Timothy").
 Full text of earlier versions: git history of this file (agent #7 version = `a9c8d61`).
 
 ---
@@ -18,7 +18,7 @@ Full text of earlier versions: git history of this file (agent #7 version = `a9c
 | Other libs | kotlinx.serialization 1.6.3 (backup JSON, custom colours JSON), Coil 2.6.0 (photos in `filesDir/photos`) |
 | Build | Gradle 8.7 (wrapper NOT committed; CI runs `gradle wrapper --gradle-version 8.7`), JDK 17, minSdk 29, target/compile 34 |
 | applicationId | `com.example.homemenu` (must never change) |
-| Version | `modernization`: `versionCode = 1`, `versionName = "1.0"`. **PR #4 (`task8-versioning`): `versionCode = 2`, `versionName = "1.1.0"`, `BuildConfig.BUILD_DATE`.** |
+| Version | `modernization`: `versionCode = 2`, `versionName = "1.1.0"`, `BuildConfig.BUILD_DATE` (UTC date). `main`: 1 / "1.0". |
 | Signing | No signingConfig. CI builds `assembleDebug` with the runner's random debug key (F2). |
 | CI | `.github/workflows/android.yml`: job `build` (assembleDebug, testDebugUnitTest incl. Robolectric, lintDebug abortOnError) + jobs `instrumented (29, pixel_4)` and `instrumented (34, pixel_tablet)`. Runs on push and on pull_request (two runs per PR commit). ~4 min build, ~10 min instrumented. |
 | Commands (CI) | `./gradlew assembleDebug testDebugUnitTest lintDebug`, `./gradlew connectedDebugAndroidTest` |
@@ -36,27 +36,28 @@ Full text of earlier versions: git history of this file (agent #7 version = `a9c
 
 ### Working rules
 - No local JDK/Gradle/SDK. Code changes go through the GitHub API; **CI is the only build/test environment**.
-- **Per task: feature branch from `modernization`, commits there, draft PR into `modernization`, read its checks, merge only when `build` and both instrumented jobs are green in at least one run on the head commit.** `modernization` -> `main` only via PR #1 after all tasks are verified and migration is tested.
+- **Per task: feature branch from `modernization`, commits there, draft PR into `modernization`, read its checks, mark ready (`update_pull_request` draft=false; a draft cannot be merged), merge only when `build` and both instrumented jobs are green in at least one run on the head commit.** `modernization` -> `main` only via PR #1 after all tasks are verified and migration is tested.
 - Docs-only commits: `[skip ci]`. Multi-part changes: intermediate parts `[skip ci]`, last part without it.
 - Never force-push, rewrite history, or commit keystores/passwords/tokens.
-- Tooling: "get file contents" returns only the blob SHA. Read bodies from commit diffs (`get_commit` `full_patch`). `87a602d` = original upload of every file; with `perPage=1, page=N` one file is returned (build.gradle.kts = 6, MainActivity = 11, Mappers = 12, Repositories = 18, SeedData = 19, Seeder = 20, Models = 27, MainViewModel = 28, MenuScreen = 32, MenuViewModel = 33, AppNav = 34, RecipeDetailScreen = 35, RecipeEditScreen = 36, RecipeViewModels = 37, RecipesScreen = 38, SettingsScreen = 39, SettingsViewModel = 40, Color.kt = 43, Theme.kt = 44). Reconstruct = original + every later patch (`list_commits` with `path` gives the list). **After each write, check the commit's diff stats: they must show only the intended lines** (agent #8 did this for every file).
-- Files whose full current body is known exactly (agent #8): `SeedData.kt` + `Seeder.kt` @ `3d0ac4e`, `app/build.gradle.kts` @ `2027982`, `SettingsScreen.kt` @ `dafe021` (all on their feature branches).
-- `push_files` can write several files in ONE commit (no 409). Never write two commits to the same branch in parallel.
+- Tooling: "get file contents" returns only the blob SHA. Read bodies from commit diffs (`get_commit` `full_patch`). `87a602d` = original upload of every file; with `perPage=1, page=N` one file is returned (build.gradle.kts = 6, MainActivity = 11, Mappers = 12, Repositories = 18, SeedData = 19, Seeder = 20, Models = 27, MainViewModel = 28, MenuScreen = 32, MenuViewModel = 33, AppNav = 34, RecipeDetailScreen = 35, RecipeEditScreen = 36, RecipeViewModels = 37, RecipesScreen = 38, SettingsScreen = 39, SettingsViewModel = 40, Color.kt = 43, Theme.kt = 44). Reconstruct = original + every later patch (`list_commits` with `path` gives the list). **After each write, check the commit's diff stats: they must show only the intended lines.**
+- Files whose full current body is known exactly (agent #8): `SeedData.kt` + `Seeder.kt` @ `3d0ac4e`, `app/build.gradle.kts` @ `8e68c59`, `SettingsScreen.kt` @ `dafe021`, this file @ its latest commit (written whole).
+- **Kotlin DSL gotcha:** in `app/build.gradle.kts` write `import java.time.X` at the top; a fully qualified `java.time.X` clashes with the generated `java` extension accessor and fails configuration (seen on `dafe021`, fixed in `8e68c59`).
+- `push_files` can write several files in ONE commit. Never write two commits to the same branch in parallel.
 - `search_code` (`repo:Vano3667/recipe-app`) returns code fragments but indexes only `main`.
-- **CI visibility:** no Actions tool; `pull_request_read` method `get_check_runs` on a PR returns the head commit's jobs with status/conclusion (no logs). Logs of a failed job: ask the user to open the job link and paste the failing step.
+- **CI visibility:** no Actions tool; `pull_request_read` method `get_check_runs` returns the head commit's jobs with status/conclusion (no logs). Logs of a failed job: ask the user to open the job link and paste the failing step.
 
 ---
 
 ## B. Task checklist
 
 1. [ ] Bulk ingredient input — TESTED (CI green; manual UI check pending)
-2. [ ] Tags + full cuisine removal — IMPLEMENTED (last code leftover in PR #3, CI pending; README line pending)
+2. [ ] Tags + full cuisine removal — TESTED (code clean, merged `45e3485`; README line + tag UI tests pending)
 3. [ ] Multiple recipes per meal — TESTED (CI green; manual UI check and migration test pending)
 4. [ ] Complete ZIP and JSON export/import — IMPLEMENTED (round-trip/rollback tests missing)
 5. [ ] Recipe sharing + text import — TESTED (CI green; manual Sharesheet/TXT check pending)
 6. [ ] Fix existing import bug — BLOCKED, WAITING FOR USER FILE
 7. [ ] Six themes + custom colours — TESTED (CI green, merged; hard-coded colour scan + UI test pending)
-8. [ ] Safe APK updates — IN PROGRESS (versioning + build date in PR #4, CI pending), signing BLOCKED
+8. [ ] Safe APK updates — IN PROGRESS (versioning + build date TESTED, merged `653c783`); signing BLOCKED
 
 Supporting: migration test on real v1 DB (F4); data preservation; UI consistency; release APK.
 
@@ -66,15 +67,15 @@ Supporting: migration test on real v1 DB (F4); data preservation; UI consistency
 
 Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED. TESTED = CI build + unit + Robolectric + lint + instrumented green; VERIFIED would also need a manual check on a device.
 
-**Global state (2026-11-16 22:35 UTC):** `modernization` @ `d71f480` (Task 7 merge) + docs commits. Code of `d34b01d` and `2d39e8a` was green in CI (API 34 flaky, F7). Two open draft PRs by agent #8: #3 (Task 2) and #4 (Task 8), CI running.
+**Global state (2026-11-16 23:08 UTC):** `modernization` @ `653c783` (merge of PR #4) + this docs commit. Contains `45e3485` (merge of PR #3). Every merged head had build + API 29 + API 34 green in at least one run.
 
 ### Task 1 — Bulk ingredient input: TESTED
 - Parser `domain/IngredientLineParser.kt` (`9da0cbc`) + tests (`0fec6c8`). Dialog `ui/recipes/BulkIngredientsDialog.kt` (`cfbd8d2`, `ab3c0f8`, `7fcf342`): "Вставить списком" -> paste -> "Разобрать" -> editable preview, remove, hints, duplicates unchecked -> "Добавить (n)". Order preserved. Single-add untouched. `BulkIngredientsTest` green.
 - Missing: Robolectric/instrumented test of the dialog; known risk: if `vm.addCustomProduct` fails and never calls back, remaining rows are not added.
 
-### Task 2 — Tags + cuisine removal: IMPLEMENTED
+### Task 2 — Tags + cuisine removal: TESTED
 - Earlier: cuisine removed from domain (`047d9e6`, incl. `DEFAULT_CUISINES`), edit state (`5961b4f`), detail (`4328ad3`), edit form (`5be7b4d`, `CuisineField` deleted). Tags multi-select at the bottom (`TagMultiSelect`: removable chips, dropdown with checkboxes, separate "Новый тег"), case-insensitive dedupe (`aa8edfe`).
-- **Agent #8 audit (via commit diffs on `modernization`):** `Models.kt` (no `cuisine`, no `DEFAULT_CUISINES`), `RecipeEditScreen.kt` (no `CuisineField`), `Mappers.kt`, `Seeder.kt` clean. Remaining code trace was `SeedData.SeedRecipe.cuisine` -> removed in `3d0ac4e` on `task2-cuisine-cleanup` (PR #3). Diff: 15 recipe lines + field only.
+- Agent #8: audit via commit diffs (`Models.kt`, `RecipeEditScreen.kt`, `Mappers.kt`, `Seeder.kt` clean); last code trace `SeedData.SeedRecipe.cuisine` removed in `3d0ac4e` (PR #3, CI build + API 29 + API 34 green in both runs, merged `45e3485`).
 - Kept on purpose: DB column `recipes.cuisine` (no table rebuild; existing values preserved) and backup v1 `BackupRecipe.cuisine` (old backups stay readable; `BackupJsonTest` uses it).
 - Missing: README.md line "категория, кухня (готовые варианты и свои)" in "Возможности" (README history: `87a602d`, `717fc83`, `eaea137`); tests for tag select/create/remove.
 
@@ -94,11 +95,11 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 - Requested by agents #5-#8. When it arrives: reproduce in a unit test against `BackupManager` staging / `BackupJson.decode`, find root cause, fix, verify DB and photos.
 
 ### Task 7 — Themes + custom colours: TESTED (merged `d71f480`)
-- See PR #2 and agent #7 version of this file (`a9c8d61`) for the full description. Missing: hard-coded colour scan (`Color(0x...)`, `Color.White/Black`, `tagColors(hint, dark)` callers), Robolectric test of AppearanceContent, manual check.
+- See PR #2 and `a9c8d61` version of this file. Missing: hard-coded colour scan (`Color(0x...)`, `Color.White/Black`, `tagColors(hint, dark)` callers), Robolectric test of AppearanceContent, manual check.
 
 ### Task 8 — Safe APK updates: IN PROGRESS, signing BLOCKED
 - Done earlier: build number in About (`16c5dfb`).
-- **Agent #8 (PR #4, branch `task8-versioning`):** `2027982` build.gradle.kts: `versionCode` 2, `versionName` "1.1.0", `buildConfigField("String", "BUILD_DATE", ...)` (UTC date at configuration time); `dafe021` About card line "Дата сборки …" (tag `about_build_date`). applicationId/namespace unchanged.
+- Agent #8 (PR #4, merged `653c783`): `2027982` + fix `8e68c59` build.gradle.kts: `versionCode` 2, `versionName` "1.1.0", `BuildConfig.BUILD_DATE` (UTC date at configuration time, `import java.time.*` at the top); `dafe021` About card line "Дата сборки …" (tag `about_build_date`). applicationId/namespace unchanged.
 - Missing: release signing (F2), CI `assembleRelease`, update-over-install test, Room schema export + migration test (F4).
 
 ### Technical decisions (agent #8 additions; earlier table in `a9c8d61`)
@@ -107,6 +108,7 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 | Keep `recipes.cuisine` column and backup v1 field | No destructive migration; old backups import | 3d0ac4e |
 | versionCode +1 per APK given to the user; 1.1.0 for the modernization release | Android refuses updates with a lower/equal code | 2027982 |
 | BUILD_DATE as date only (UTC), not a timestamp | Readable in About; same format on every machine | 2027982 |
+| `import java.time.*` in build script | FQN clashes with `java` accessor | 8e68c59 |
 | Separate "Дата сборки" line, existing `about_build` line unchanged | Existing tests keep their tags | dafe021 |
 
 ---
@@ -115,27 +117,33 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 
 - `main` @ `2ceef75` green (CI #11).
 - Agents #1-#7: see `a9c8d61` version of this file (section E there).
-- Agent #8 (2026-11-16 22:20-22:35 UTC):
-  - branch `task2-cuisine-cleanup` from `a9c8d61`: `3d0ac4e` SeedData/Seeder (CI triggered). Draft PR #3 -> `modernization`.
-  - branch `task8-versioning` from `a9c8d61`: `2027982` build.gradle.kts [no skip ci], `dafe021` SettingsScreen (CI triggered). Draft PR #4 -> `modernization`.
-  - this docs commit on `modernization` [skip ci].
-- All pushes verified by the API response and by reading the commit diff back.
+- Agent #8 (2026-11-16 22:20-23:08 UTC):
+  - `task2-cuisine-cleanup`: `3d0ac4e` -> PR #3 -> merged `45e3485`.
+  - `task8-versioning`: `2027982`, `dafe021` (build FAILED at configuration, both runs), `8e68c59` fix -> PR #4 -> merged `653c783`.
+  - docs: `9a4d522` and this commit on `modernization` [skip ci].
+- All pushes verified by the API response and by reading the commit diff back. Merges verified by the merge API response (`merged: true`).
 
 ---
 
 ## E. Testing
 
-- Agents cannot run Gradle; only CI. Last known results: see section C global state.
-- Agent #8 own checks: diff review of every written file (only intended lines changed). **No build or test result for agent #8 commits yet.**
+| Commit | Run | build | API 29 | API 34 |
+|---|---|---|---|---|
+| `3d0ac4e` (PR #3) | 43970267337 (push) | green | green | green |
+| `3d0ac4e` (PR #3) | 43970340643 (PR) | green | green | green |
+| `dafe021` (PR #4) | 43970678742, 43970740872 | FAILED ~1 min (config) | skipped | skipped |
+| `8e68c59` (PR #4) | 43973554458 | green | green | green |
+| `8e68c59` (PR #4) | 43973547049 | **FAILED after 3.5 min** (cause unknown, no logs) | skipped | skipped |
+
+- The `8e68c59` failure in run 43973547049: same code passed in 43973554458, so most likely a flaky unit/Robolectric test or runner issue, NOT proven. Next agent: if any later run fails `build` again, ask the user for the failing step of job 133671611335 (Actions tab) and fix the flaky test.
+- Merge commits `45e3485` and `653c783` themselves: push CI on `modernization` will run; not read yet.
 
 ## PENDING TESTS AND CHECKS
 
-| Commit | Branch / PR | Jobs | Started (UTC) | How to read | Status |
-|---|---|---|---|---|---|
-| `3d0ac4e` | `task2-cuisine-cleanup` / PR #3 | build (push run 43970267337, PR run 43970340643), then instrumented 29 + 34 | 22:27 | `pull_request_read` `get_check_runs` pullNumber 3 | PENDING (build in progress at 22:30) |
-| `dafe021` | `task8-versioning` / PR #4 | build + instrumented 29 + 34 | ~22:30 | `pull_request_read` `get_check_runs` pullNumber 4 | PENDING |
-
-Likely failure points: PR #3 — any test that builds `SeedRecipe` positionally or reads `.cuisine` (none found on `main`). PR #4 — a test asserting `versionCode == 1` / "Сборка 1" / "версия 1.0"; Kotlin DSL string escaping of `BUILD_DATE`.
+| Commit | What | How to read | Status |
+|---|---|---|---|
+| `653c783` (modernization, merge of PR #4) | push CI (build + instrumented) | Draft PR #1 head is the docs commit [skip ci] -> no checks there. Next code commit on a PR will show it; or ask the user for the Actions result | PENDING, not read |
+| `8e68c59` run 43973547049 | build failure root cause | user: job 133671611335 log | UNKNOWN |
 
 ---
 
@@ -145,16 +153,17 @@ Likely failure points: PR #3 — any test that builds `SeedRecipe` positionally 
 - **F3 Import bug file (Task 6, user):** waiting for the failing file. Independent work continues.
 - **F4 Room schemas not committed:** needed for a 1->2 `MigrationTestHelper` test. Generate v1 schema from `2ceef75` in CI, commit `app/schemas/.../1.json`, add `room-testing`.
 - **F5** `AGENT.md` and `TEST_REPORT.md` outdated.
-- **F7 Flaky instrumented job on API 34 (confirmed):** same commit failed API 34 in 1 of 3 and 1 of 2 runs. Earlier `AppFlowsTest.addRecipeWithIngredient` ("product_search" not found). Next: get failing test name from the job log, harden waits.
+- **F7 Flaky instrumented job on API 34:** earlier 1 of 3 and 1 of 2 runs failed; agent #8's runs were all green on API 34.
+- **F9 (new) Possible flaky `build` job:** see section E (`8e68c59`, run 43973547049).
 
 ---
 
 ## G. NEXT AGENT — START HERE
 
-1. **State:** `modernization` @ `d71f480` + docs. Open draft PRs: #3 (Task 2 seed cleanup, head `3d0ac4e`), #4 (Task 8 versioning + build date, head `dafe021`). PR #1 stays draft.
-2. **First:** `pull_request_read` `get_check_runs` for PR #3 and PR #4. If `build` + both instrumented green (API 34 may be flaky, F7: green in at least one run), merge each into `modernization` (merge commit, no squash needed). If red: fix on the same branch with a small commit; ask the user for the job log if the cause is not obvious. Update the PENDING table.
-3. **Then:** README cuisine line (Task 2) -> Task 7 hard-coded colour scan -> Task 4 round-trip/rollback tests -> F4 migration test -> F7 hardening -> Task 5 optional share intent -> Task 8 signing (after user answer) -> Task 6 (after user file). Update `TEST_REPORT.md`.
-4. **Precautions:** never change `applicationId`; no `fallbackToDestructiveMigration`; keep legacy `cuisine` column; do not merge PR #1 until CI green and migration tested; no secrets in git; check every write's diff stats.
+1. **State:** `modernization` @ `653c783` + docs. Tasks 1, 2, 3, 5, 7 TESTED; Task 8 versioning TESTED, signing BLOCKED; Task 4 IMPLEMENTED; Task 6 BLOCKED. No open feature PRs. PR #1 stays draft.
+2. **Next action:** new branch `task7-colour-scan` from `modernization`: find hard-coded colours (`search_code` on `main`: `Color(0x`, `Color.White`, `Color.Black`, `tagColors(`), map each to `MaterialTheme.colorScheme` roles, reconstruct each file from `87a602d` + later patches, verify diff stats, PR, CI, merge.
+3. **Then:** README cuisine line (Task 2) -> Task 4 round-trip/rollback unit tests (`BackupJsonTest`, `BackupManager` staging) -> F4 migration test -> Task 5 optional share intent -> Task 8 signing (after user answer) -> Task 6 (after user file). Update `TEST_REPORT.md`.
+4. **Precautions:** never change `applicationId`; no `fallbackToDestructiveMigration`; keep legacy `cuisine` column; do not merge PR #1 until CI green and migration tested; no secrets in git; check every write's diff stats; mark PRs ready before merging.
 
 ---
 
