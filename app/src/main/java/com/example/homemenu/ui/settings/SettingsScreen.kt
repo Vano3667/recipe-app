@@ -245,6 +245,7 @@ fun SettingsContent(
             SettingsCard("О приложении") {
                 Text("Домашнее меню · версия ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
                 Text("Сборка ${BuildConfig.VERSION_CODE}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("about_build"))
+                Text("Дата сборки ${BuildConfig.BUILD_DATE}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("about_build_date"))
                 Text(
                     "Рецепты, меню на неделю и список покупок. Работает полностью офлайн, данные хранятся только на устройстве.\nШрифты Lora и Nunito — SIL Open Font License. Иллюстрации нарисованы в коде (CC0).",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
