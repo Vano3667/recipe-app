@@ -16,7 +16,7 @@ import kotlin.math.roundToInt
 
 /** Colour themes. Stored by [name] in `user_settings.themeId`. LEGACY = the original v1 look that follows ThemeMode. */
 enum class AppThemeId(val title: String, val description: String) {
-    LEGACY("Классическая", "Исходное оформление, светлое или тёмное по настройке ниже"),
+    LEGACY("Классическая", "Исходное оформление, светлое или тёмное по настройке выше"),
     LIGHT_MINIMAL("Светлая", "Белый фон, спокойный синий акцент"),
     WARM_CREAM("Кремовая", "Тёплый кремовый фон, карамельные акценты"),
     NATURAL_GREEN("Зелёная", "Мягкая зелень и светлый шалфей"),
@@ -205,9 +205,9 @@ object ThemePalettes {
     }
 
     /** The base preset with the user's overrides applied; dependent colours are derived. */
-    fun custom(c: CustomAppearance): ThemePalette {
-        var p = preset(c.base) ?: LIGHT_MINIMAL
-        val o = c.colors
+    fun custom(appearance: CustomAppearance): ThemePalette {
+        var p = preset(appearance.base) ?: LIGHT_MINIMAL
+        val o = appearance.colors
         o[CustomRole.BACKGROUND]?.let { p = p.copy(background = it, dark = ColorMath.luminance(it) < 0.25) }
         o[CustomRole.SECONDARY_BACKGROUND]?.let { p = p.copy(surfaceVariant = it, surfaceLow = it) }
         o[CustomRole.SURFACE]?.let { p = p.copy(surface = it, surfaceContainer = it) }
@@ -229,9 +229,9 @@ object ThemePalettes {
     }
 
     /** Palette shown on a theme's preview card. */
-    fun previewOf(id: AppThemeId, custom: CustomAppearance): ThemePalette = when (id) {
+    fun previewOf(id: AppThemeId, saved: CustomAppearance): ThemePalette = when (id) {
         AppThemeId.LEGACY -> LEGACY_PREVIEW
-        AppThemeId.CUSTOM -> custom(custom)
+        AppThemeId.CUSTOM -> custom(saved)
         else -> preset(id) ?: LIGHT_MINIMAL
     }
 
