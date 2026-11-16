@@ -139,6 +139,7 @@ fun RecipeEditContent(
     photoPicker: @Composable ((name: String?, stepIndex: Int?, tagPrefix: String) -> Unit)? = null,
 ) {
     var pickProduct by remember { mutableStateOf(false) }
+    var bulkPaste by remember { mutableStateOf(false) }
     var newTag by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -220,8 +221,14 @@ fun RecipeEditContent(
                     index = i,
                 )
             }
-            OutlinedButton(onClick = { pickProduct = true }, modifier = Modifier.testTag("add_ingredient")) {
-                Icon(Icons.Filled.Add, null); Spacer(Modifier.width(6.dp)); Text("Добавить ингредиент")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { pickProduct = true }, modifier = Modifier.testTag("add_ingredient")) {
+                    Icon(Icons.Filled.Add, null); Spacer(Modifier.width(6.dp)); Text("Добавить ингредиент")
+                }
+                // Task 1: несколько ингредиентов сразу — вставка списка, предпросмотр, правка строк (BulkIngredientsDialog.kt).
+                OutlinedButton(onClick = { bulkPaste = true }, modifier = Modifier.testTag("bulk_ingredients")) {
+                    Text("Вставить списком")
+                }
             }
 
             SectionTitle("Шаги")
@@ -285,6 +292,16 @@ fun RecipeEditContent(
             onCreate = { name, unit, dep ->
                 pickProduct = false
                 onAddProduct(name, unit, dep) { p -> onChange { it.copy(ingredients = it.ingredients + EditIngredient(p, "", p.baseUnit)) } }
+            },
+        )
+    }
+    if (bulkPaste) {
+        BulkIngredientsDialog(
+            existingNames = form.ingredients.map { it.product.name },
+            onDismiss = { bulkPaste = false },
+            onConfirm = { rows ->
+                bulkPaste = false
+                BulkIngredients.append(rows, products, onChange, onAddProduct)
             },
         )
     }
