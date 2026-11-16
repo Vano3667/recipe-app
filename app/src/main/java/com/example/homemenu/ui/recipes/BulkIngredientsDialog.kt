@@ -117,11 +117,21 @@ object BulkIngredients {
     }
 }
 
-/** Step 1: paste a list. Step 2: check and correct the parsed rows. Then "Добавить" adds the checked rows. */
+/**
+ * Step 1: paste a list. Step 2: check and correct the parsed rows. Then "Добавить" adds the checked rows.
+ * [initialText] not blank (text import, Task 5): the dialog opens directly on the parsed rows.
+ * [confirmLabel] replaces "Добавить (n)" when the caller does something else with the rows.
+ */
 @Composable
-fun BulkIngredientsDialog(existingNames: List<String>, onDismiss: () -> Unit, onConfirm: (List<BulkRow>) -> Unit) {
-    var text by remember { mutableStateOf("") }
-    var rows by remember { mutableStateOf<List<BulkRow>?>(null) }
+fun BulkIngredientsDialog(
+    existingNames: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (List<BulkRow>) -> Unit,
+    initialText: String = "",
+    confirmLabel: String? = null,
+) {
+    var text by remember { mutableStateOf(initialText) }
+    var rows by remember { mutableStateOf<List<BulkRow>?>(if (initialText.isBlank()) null else BulkIngredients.toRows(initialText, existingNames)) }
     val preview = rows
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -165,7 +175,7 @@ fun BulkIngredientsDialog(existingNames: List<String>, onDismiss: () -> Unit, on
                 TextButton(
                     onClick = { onConfirm(accepted) },
                     enabled = accepted.isNotEmpty(), modifier = Modifier.testTag("bulk_add_all"),
-                ) { Text("Добавить (${accepted.size})") }
+                ) { Text(confirmLabel ?: "Добавить (${accepted.size})") }
             }
         },
         dismissButton = {
