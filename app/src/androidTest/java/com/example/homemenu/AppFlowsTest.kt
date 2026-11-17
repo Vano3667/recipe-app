@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.Intents.intending
 import androidx.test.espresso.intent.matcher.IntentMatchers.isInternal
@@ -65,6 +66,25 @@ class AppFlowsTest {
         } catch (e: Throwable) {
             throw AssertionError("Элемент с тегом «$tag» не стал выбранным за $timeout мс", e)
         }
+    }
+
+    /**
+     * Opens the product picker of the recipe editor. On the API 34 tablet the click that follows typing
+     * (keyboard open, layout still settling) was sometimes lost (F7), so: hide the keyboard, wait for idle,
+     * click, and retry the click if the picker did not appear.
+     */
+    private fun openProductSearch() {
+        runCatching { Espresso.closeSoftKeyboard() }
+        rule.waitForIdle()
+        repeat(3) {
+            rule.onNodeWithTag("add_ingredient").performScrollTo().performClick()
+            rule.waitForIdle()
+            val opened = runCatching {
+                rule.waitUntil(10_000) { rule.onAllNodesWithTag("product_search").fetchSemanticsNodes().isNotEmpty() }
+            }.isSuccess
+            if (opened) return
+        }
+        waitTag("product_search", 5_000)
     }
 
     private fun go(dest: TopDestination) {
@@ -129,8 +149,7 @@ class AppFlowsTest {
         rule.onNodeWithTag("name_field").performTextInput(name)
         rule.onNodeWithTag("servings_field").performTextClearance()
         rule.onNodeWithTag("servings_field").performTextInput("2")
-        rule.onNodeWithTag("add_ingredient").performScrollTo().performClick()
-        waitTag("product_search")
+        openProductSearch()
         rule.onNodeWithTag("product_search").performTextInput("Молоко")
         waitTag("product_Молоко")
         rule.onNodeWithTag("product_Молоко").performClick()
@@ -179,8 +198,7 @@ class AppFlowsTest {
                 throw AssertionError("Фото из галереи не сохранилось в filesDir/photos", e)
             }
             rule.waitForIdle()
-            rule.onNodeWithTag("add_ingredient").performScrollTo().performClick()
-            waitTag("product_search")
+            openProductSearch()
             rule.onNodeWithTag("product_search").performTextInput("Молоко")
             waitTag("product_Молоко")
             rule.onNodeWithTag("product_Молоко").performClick()
