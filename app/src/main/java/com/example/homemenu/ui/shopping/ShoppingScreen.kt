@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -33,6 +34,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,16 +59,40 @@ import java.time.LocalDate
 fun ShoppingRoute(onOpenMenu: () -> Unit, vm: ShoppingViewModel = hiltViewModel()) {
     val state by vm.state.collectAsState()
     val context = LocalContext.current
+    var askShare by remember { mutableStateOf(false) }
+    val share: (Boolean) -> Unit = { onlyRemaining ->
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_SUBJECT, "Список покупок")
+            .putExtra(Intent.EXTRA_TEXT, vm.shareText(onlyRemaining))
+        context.startActivity(Intent.createChooser(send, "Поделиться списком"))
+    }
     ShoppingContent(
         state = state,
         onMode = vm::setMode, onPrev = vm::previous, onNext = vm::next, onRange = vm::setRange,
         onToggle = vm::toggle, onClear = vm::clearChecks,
         onShare = {
-            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, vm.shareText())
-            context.startActivity(Intent.createChooser(send, "Поделиться списком"))
+            // Ask only when the choice matters: the list is partly ticked.
+            if (state.done > 0 && state.done < state.total) askShare = true else share(false)
         },
         onOpenMenu = onOpenMenu,
     )
+    if (askShare) {
+        AlertDialog(
+            onDismissRequest = { askShare = false },
+            title = { Text("Что отправить?") },
+            text = { Text("Куплено ${state.done} из ${state.total}.") },
+            confirmButton = {
+                TextButton(onClick = { askShare = false; share(true) }, modifier = Modifier.testTag("share_remaining")) {
+                    Text("Только некупленное")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { askShare = false; share(false) }, modifier = Modifier.testTag("share_all")) {
+                    Text("Весь список")
+                }
+            },
+        )
+    }
 }
 
 @Composable

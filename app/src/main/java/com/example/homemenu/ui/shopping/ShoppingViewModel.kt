@@ -90,8 +90,8 @@ class ShoppingViewModel @Inject constructor(
         viewModelScope.launch { shoppingRepo.clearChecks(r.from, r.to) }
     }
 
-    fun shareText(): String {
+    fun shareText(onlyRemaining: Boolean = false): String {
         val s = state.value
-        return useCase.shareText("Покупки: ${rangeLabel(s.range.from, s.range.to)}", s.groups, s.checked)
+        return useCase.shareText("Покупки: ${rangeLabel(s.range.from, s.range.to)}", s.groups, s.checked, onlyRemaining)
     }
 }
