@@ -20,9 +20,13 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -66,7 +70,6 @@ fun AppearanceSection(vm: AppearanceViewModel = hiltViewModel()) {
     )
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppearanceContent(
     state: AppearanceUi,
@@ -76,19 +79,38 @@ fun AppearanceContent(
     onResetCustom: () -> Unit,
     onResetDefault: () -> Unit,
 ) {
+    var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.testTag("appearance_section")) {
         Text(
-            "Нажмите на тему, чтобы применить её сразу. Выбор сохраняется после перезапуска и обновления.",
+            "Выберите тему из списка, она применится сразу. Выбор сохраняется после перезапуска и обновления.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            AppThemeId.entries.forEach { id ->
-                ThemePreviewCard(
-                    id = id,
-                    palette = ThemePalettes.previewOf(id, state.custom),
-                    selected = state.themeId == id,
-                    onClick = { onSelect(id) },
-                )
+        ThemeDropdownHeader(
+            id = state.themeId,
+            palette = ThemePalettes.previewOf(state.themeId, state.custom),
+            expanded = expanded,
+            onClick = { expanded = !expanded },
+        )
+        if (expanded) {
+            // Compact grid: two themes per row.
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("theme_grid")) {
+                AppThemeId.entries.chunked(2).forEachIndexed { row, pair ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("theme_row_$row"),
+                    ) {
+                        pair.forEach { id ->
+                            ThemePreviewCard(
+                                id = id,
+                                palette = ThemePalettes.previewOf(id, state.custom),
+                                selected = state.themeId == id,
+                                onClick = { expanded = false; onSelect(id) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
             }
         }
         Text(
@@ -106,38 +128,76 @@ fun AppearanceContent(
     }
 }
 
+/** One-line selector: current theme's colours and name; tap to show or hide all themes. */
+@Composable
+private fun ThemeDropdownHeader(id: AppThemeId, palette: ThemePalette, expanded: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .border(1.dp, MaterialTheme.colorScheme.outline, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .testTag("theme_dropdown"),
+    ) {
+        listOf(palette.background, palette.primary, palette.secondaryContainer).forEach { c ->
+            Box(
+                Modifier.size(18.dp).clip(CircleShape).background(Color(c))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+            )
+            Spacer(Modifier.width(4.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            id.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f),
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        Icon(
+            if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown,
+            contentDescription = if (expanded) "Свернуть список тем" else "Показать все темы",
+        )
+    }
+}
+
 /** Mini preview drawn in the theme's own colours, independent of the current theme. */
 @Composable
-private fun ThemePreviewCard(id: AppThemeId, palette: ThemePalette, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
+private fun ThemePreviewCard(
+    id: AppThemeId,
+    palette: ThemePalette,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(14.dp)
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     Column(
         verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .width(148.dp)
+        modifier = modifier
             .clip(shape)
             .background(Color(palette.background))
             .border(if (selected) 3.dp else 1.dp, borderColor, shape)
             .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
-            .padding(10.dp)
+            .padding(8.dp)
             .testTag("theme_card_${id.name}"),
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(palette.surfaceHigh)).padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(palette.surfaceHigh)).padding(6.dp),
         ) {
-            Box(Modifier.width(72.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(Color(palette.onColor(palette.surfaceHigh))))
-            Box(Modifier.width(48.dp).height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(palette.onVariant(palette.surfaceHigh))))
+            Box(Modifier.width(64.dp).height(7.dp).clip(RoundedCornerShape(4.dp)).background(Color(palette.onColor(palette.surfaceHigh))))
+            Box(Modifier.width(40.dp).height(5.dp).clip(RoundedCornerShape(3.dp)).background(Color(palette.onVariant(palette.surfaceHigh))))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.width(52.dp).height(20.dp).clip(RoundedCornerShape(10.dp)).background(Color(palette.primary)),
+                modifier = Modifier.width(44.dp).height(18.dp).clip(RoundedCornerShape(9.dp)).background(Color(palette.primary)),
             ) {
-                Box(Modifier.width(24.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(palette.onColor(palette.primary))))
+                Box(Modifier.width(20.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color(palette.onColor(palette.primary))))
             }
-            Box(Modifier.size(20.dp).clip(CircleShape).background(Color(palette.primaryContainer)))
-            Box(Modifier.size(20.dp).clip(CircleShape).background(Color(palette.secondaryContainer)))
+            Box(Modifier.size(18.dp).clip(CircleShape).background(Color(palette.primaryContainer)))
+            Box(Modifier.size(18.dp).clip(CircleShape).background(Color(palette.secondaryContainer)))
         }
         Text(
             (if (selected) "✓ " else "") + id.title,
