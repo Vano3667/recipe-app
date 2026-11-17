@@ -219,6 +219,11 @@ fun RecipeEditContent(
                     onUnit = { u -> onChange { f -> f.copy(ingredients = f.ingredients.mapIndexed { j, x -> if (j == i) x.copy(unit = u) else x }) } },
                     onRemove = { onChange { f -> f.copy(ingredients = f.ingredients.filterIndexed { j, _ -> j != i }) } },
                     index = i,
+                    // Task 1 / 23.4: порядок ингредиентов. Сохраняется как порядок списка (position = индекс).
+                    canMoveUp = i > 0,
+                    canMoveDown = i < form.ingredients.lastIndex,
+                    onMoveUp = { onChange { f -> f.copy(ingredients = IngredientOrder.move(f.ingredients, i, i - 1)) } },
+                    onMoveDown = { onChange { f -> f.copy(ingredients = IngredientOrder.move(f.ingredients, i, i + 1)) } },
                 )
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -316,10 +321,29 @@ private fun <T> List<T>.swap(a: Int, b: Int): List<T> {
 }
 
 @Composable
-private fun IngredientRow(ing: EditIngredient, onAmount: (String) -> Unit, onUnit: (MeasureUnit) -> Unit, onRemove: () -> Unit, index: Int) {
+private fun IngredientRow(
+    ing: EditIngredient,
+    onAmount: (String) -> Unit,
+    onUnit: (MeasureUnit) -> Unit,
+    onRemove: () -> Unit,
+    index: Int,
+    canMoveUp: Boolean = false,
+    canMoveDown: Boolean = false,
+    onMoveUp: () -> Unit = {},
+    onMoveDown: () -> Unit = {},
+) {
     var unitMenu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(ing.product.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        // Стрелки стоят столбиком, чтобы на телефоне оставалось место для названия.
+        Column {
+            IconButton(onClick = onMoveUp, enabled = canMoveUp, modifier = Modifier.size(32.dp).testTag("ingredient_up_$index")) {
+                Icon(Icons.Filled.KeyboardArrowUp, "Переместить выше: ${ing.product.name}")
+            }
+            IconButton(onClick = onMoveDown, enabled = canMoveDown, modifier = Modifier.size(32.dp).testTag("ingredient_down_$index")) {
+                Icon(Icons.Filled.KeyboardArrowDown, "Переместить ниже: ${ing.product.name}")
+            }
+        }
+        Text(ing.product.name, Modifier.weight(1f).testTag("ingredient_name_$index"), style = MaterialTheme.typography.bodyLarge)
         OutlinedTextField(
             value = ing.amountText,
             onValueChange = { v -> onAmount(v.filter { it.isDigit() || it == ',' || it == '.' }.take(7)) },
