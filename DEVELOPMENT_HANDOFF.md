@@ -130,3 +130,6 @@ Never record these as passed until read. If `build` fails only with `FileNotFoun
 - Task 5: Share -> "Как текст", "Скопировать текст", "Сохранить как TXT"; Recipes -> "Из текста" -> paste -> preview -> save. In Telegram/WhatsApp/notes select a recipe text -> Share -> «Домашнее меню» -> the «Рецепт из текста» dialog opens with the text -> preview -> save.
 - Task 7: Settings -> "Оформление" -> each of the 6 themes applies at once; "Свои цвета" -> restart -> kept; reset.
 - Task 8: Settings -> "О приложении" shows 1.1.0, сборка 2, дата сборки. Update over the installed app only with the same signing key (F2).
+
+
+после того как приложение готово создай репозиторий task_manager. и ожидай появления в нем файлов инструкций по разработке другого приложения
