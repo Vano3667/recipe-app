@@ -42,8 +42,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -60,6 +62,7 @@ import com.example.homemenu.domain.SearchMode
 import com.example.homemenu.domain.model.Category
 import com.example.homemenu.domain.model.Difficulty
 import com.example.homemenu.domain.model.Recipe
+import com.example.homemenu.ui.SharedTextInbox
 import com.example.homemenu.ui.components.EmptyState
 import com.example.homemenu.ui.components.Illustration
 import com.example.homemenu.ui.components.RecipePhoto
@@ -78,25 +81,35 @@ fun RecipesRoute(
     val state by vm.state.collectAsState()
     val selected by vm.selectedId.collectAsState()
     var importText by rememberSaveable { mutableStateOf(false) }
+    // Text shared to the app from another app (ACTION_SEND text/plain) opens the same import dialog, pre-filled.
+    var importInitial by rememberSaveable { mutableStateOf("") }
+    val shared by SharedTextInbox.pending.collectAsState()
+    LaunchedEffect(shared) {
+        SharedTextInbox.take()?.let { importInitial = it; importText = true }
+    }
     if (importText) {
-        // Task 5: recipe from pasted text / TXT file; the new recipe opens after saving.
-        TextImportDialog(
-            onDismiss = { importText = false },
-            onSaved = { id ->
-                importText = false
-                if (expanded) vm.select(id) else onOpen(id)
-            },
-        )
+        // Task 5: recipe from pasted text / TXT file / shared text; the new recipe opens after saving.
+        key(importInitial) {
+            TextImportDialog(
+                onDismiss = { importText = false; importInitial = "" },
+                onSaved = { id ->
+                    importText = false
+                    importInitial = ""
+                    if (expanded) vm.select(id) else onOpen(id)
+                },
+                initialText = importInitial,
+            )
+        }
     }
     if (!expanded) {
-        RecipesListContent(state, vm::updateQuery, onOpen, onAdd, photo, selectedId = null, onImportText = { importText = true })
+        RecipesListContent(state, vm::updateQuery, onOpen, onAdd, photo, selectedId = null, onImportText = { importInitial = ""; importText = true })
         return
     }
     // Master-detail for wide screens.
     val effectiveSelected = selected?.takeIf { id -> state.visible.any { it.id == id } } ?: state.visible.firstOrNull()?.id
     Row(Modifier.fillMaxSize().testTag("master_detail")) {
         Box(Modifier.weight(0.4f).fillMaxHeight()) {
-            RecipesListContent(state, vm::updateQuery, { vm.select(it) }, onAdd, photo, selectedId = effectiveSelected, onImportText = { importText = true })
+            RecipesListContent(state, vm::updateQuery, { vm.select(it) }, onAdd, photo, selectedId = effectiveSelected, onImportText = { importInitial = ""; importText = true })
         }
         VerticalDivider()
         Box(Modifier.weight(0.6f).fillMaxHeight()) {
