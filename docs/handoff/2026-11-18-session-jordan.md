@@ -13,15 +13,16 @@ commit patches), no git/Gradle/SDK/emulator. `DEVELOPMENT_HANDOFF.md` NOT edited
 
 | Test ID | Task | Issue | User result | Developer result | Status | Next action | Commit |
 |---|---|---|---|---|---|---|---|
-| UT-23.4 | 1 | Ingredient reordering | NOT WORKING | Cause found: edit form had no reorder control for ingredients (only steps had arrows). Up/down buttons added. Unit test for move helper. | FIX IMPLEMENTED, CI PENDING | Read CI of PR #12; merge if green; user retest: move, save, reopen | `4362222` (+`9f9d973`, `4a944da`) |
+| UT-23.4 | 1 | Ingredient reordering | NOT WORKING | Cause: edit form had no reorder control for ingredients (only steps had arrows). Up/down buttons added; unit test for move helper. CI green (build, unit + Robolectric, lint, API 29/34). | FIX IMPLEMENTED, DEVELOPER TESTED (CI), USER RETEST REQUIRED | User: move an ingredient, save, reopen, check order | `4362222`, merged `4e33f7f` (PR #12) |
 | UT-23.2 | 4/6 | JSON import with fixture | NOT WORKING | Not reproduced: fixture (439 KB) has no patch in the API and file bodies are unreadable here | BLOCKED (environment) | Needs an environment with git/JDK, or the user pastes the first ~50 lines of the fixture + the error text shown in the app | none |
 | UT-23.1 | 8 | APK signature mismatch | reported | Cause (Jack): new debug key on every CI runner | BLOCKED (user) | Permanent keystore + 4 GitHub Secrets (see Jack note) | none |
 
-## Pending tests
+## Tests
 
 | Check | Run | Status |
 |---|---|---|
-| CI on `4362222` (branch `task1-ingredient-reorder`, PR #12 -> modernization) | push + pull_request runs started ~2026-11-17 22:50 UTC | PENDING. Never report as passed until read. |
+| CI on `4362222` (PR #12) | push 44193792358, PR 44193840812 | PASSED |
+| CI on merged modernization head `4e33f7f` | push run after merge | not read yet |
 
 ## Notes
 
@@ -31,6 +32,7 @@ commit patches), no git/Gradle/SDK/emulator. `DEVELOPMENT_HANDOFF.md` NOT edited
 
 ## NEXT AGENT: START HERE
 
-1. Read CI for PR #12. If red, get failed job logs and fix. If green, merge into modernization.
+1. Read CI on modernization after merge `4e33f7f`; fix if red.
 2. 23.2 JSON import: needs an environment that can read the fixture (see Jack note, step 3).
 3. 23.1 signing: still waiting for keystore secrets from the user.
+4. Optional: Robolectric test save -> reopen keeps ingredient order.
