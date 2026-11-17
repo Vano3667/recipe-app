@@ -2,8 +2,8 @@
 
 Persistent continuation guide for AI coding agents working on this repository.
 Read this file first, then `AGENT.md` (Russian summary for the user, rewritten by agent #11; not yet updated by agent #12).
-Last updated: 2026-11-17 04:50 UTC (agent #12).
-Full text of earlier versions: git history of this file (agent #7 = `a9c8d61`, #8 = `09af78a`, #9 = `cc95a03`, #10 = `123a8ab`, #11 = `1ff922f`).
+Last updated: 2026-11-17 05:05 UTC (agent #12).
+Full text of earlier versions: git history of this file (agent #7 = `a9c8d61`, #8 = `09af78a`, #9 = `cc95a03`, #10 = `123a8ab`, #11 = `1ff922f`, #12 part 1 = `ff71109`).
 Per-task file lists and older decision tables are in `cc95a03` / `a9c8d61`.
 
 ---
@@ -22,13 +22,12 @@ Per-task file lists and older decision tables are in `cc95a03` / `a9c8d61`.
 | Commands (CI) | `./gradlew assembleDebug testDebugUnitTest lintDebug`, `./gradlew connectedDebugAndroidTest` |
 
 ### Working rules
-- No local JDK/Gradle/SDK; CI is the only build/test environment. Actions tools work: `actions_list` (`list_workflow_runs`, `list_workflow_jobs`), `get_job_logs` (`job_id` or `run_id` + `failed_only`, `return_content`, `tail_lines`), `actions_run_trigger` (`rerun_failed_jobs`), `pull_request_read` `get_check_runs`.
+- No local JDK/Gradle/SDK; CI is the only build/test environment. Actions tools work: `actions_list` (`list_workflow_runs`, `list_workflow_jobs`), `get_job_logs` (`job_id` or `run_id` + `failed_only`, `return_content`, `tail_lines`), `actions_run_trigger` (`rerun_failed_jobs`), `pull_request_read` `get_check_runs`, `merge_pull_request` (with `expectedHeadSha`).
 - Per task: branch from `modernization` -> draft PR into `modernization` -> green `build` + both instrumented on the head commit -> mark ready (draft=false) -> merge. `modernization` -> `main` only via PR #1 after all tasks are verified.
 - Docs-only commits: `[skip ci]`, may go straight to `modernization`. Never force-push; no secrets in git.
-- **Reading files:** "get file contents" returns only the blob SHA. Reconstruction: (1) `get_commit 87a602d detail=full_patch perPage=100` (large result) -> every `+` line per file = original upload; (2) `pull_request_read get_diff pullNumber=1` = whole `modernization` vs `main` diff -> apply onto (1), except files `main` changed after `87a602d` (README, TEST_REPORT, AGENT.md, ENVIRONMENT, AppFlowsTest, AndroidManifest, PhotoStorage, PhotoPicker, RecipeEditScreen, file_paths.xml, ComposeScreensTest, android.yml: apply the `main` patches `717fc83`, `b1b4ab6`, `f4f4043`, `2ceef75`, `abd965d`, `e3d5d1e` first). (3) **Verify** the git blob hash (`sha1("blob <len>\0" + bytes)`) against `get_repository_tree tree_sha=<branch>`. The sandbox has **no `git` binary** (agent #12): apply hunks and compute the blob hash in plain Python. Verified this way by agent #12: MainActivity `6f2b8c0`, RecipesScreen `984237f`, TextImportDialog `5c0c364`, AppNav `b158721`, MainViewModel `2ef25eb`, RecipeTextImport `0d32753`, BackupManager `8378124`, RecipeTextParser `15219b9`, RecipeDetailRoute `96995c3`, AndroidManifest `cf0567f`. Shortcut: a file that is new on `modernization` (e.g. this one) is complete as `+` lines in the PR #1 diff.
+- **Reading files:** "get file contents" returns only the blob SHA. Reconstruction: (1) `get_commit 87a602d detail=full_patch perPage=100` (large result) -> every `+` line per file = original upload; (2) `pull_request_read get_diff pullNumber=1` = whole `modernization` vs `main` diff -> apply onto (1), except files `main` changed after `87a602d` (README, TEST_REPORT, AGENT.md, ENVIRONMENT, AppFlowsTest, AndroidManifest, PhotoStorage, PhotoPicker, RecipeEditScreen, file_paths.xml, ComposeScreensTest, android.yml: apply the `main` patches `717fc83`, `b1b4ab6`, `f4f4043`, `2ceef75`, `abd965d`, `e3d5d1e` first). (3) **Verify** the git blob hash (`sha1("blob <len>\0" + bytes)`) against `get_repository_tree tree_sha=<branch>`. The sandbox has **no `git` binary** (agent #12): apply hunks and compute the blob hash in plain Python. Verified by agent #12 (before PR #9): MainActivity `6f2b8c0`, RecipesScreen `984237f`, TextImportDialog `5c0c364`, AppNav `b158721`, MainViewModel `2ef25eb`, RecipeTextImport `0d32753`, BackupManager `8378124`, RecipeTextParser `15219b9`, RecipeDetailRoute `96995c3`, AndroidManifest `cf0567f`. Shortcut: a file that is new on `modernization` (e.g. this one) is complete as `+` lines in the PR #1 diff. If the sandbox refuses to stage a large result, read it with `read_file` (long lines are split into continuation rows).
 - Kotlin DSL: `import java.time.X` at the top of `app/build.gradle.kts` (FQN clashes with the `java` accessor).
 - Low-risk pattern: new test files that do not touch existing files.
-- Feature branches created before `2c61d54` lack the F7 test fix, so their API 34 job may fail on `addRecipeWithIngredient` (`product_search`): that is F7, not the change.
 
 ---
 
@@ -38,7 +37,7 @@ Per-task file lists and older decision tables are in `cc95a03` / `a9c8d61`.
 2. [ ] Tags + full cuisine removal — TESTED (tag UI tests missing)
 3. [ ] Multiple recipes per meal — TESTED (incl. migration test and multi-dish use-case tests, merged `301f98e`)
 4. [ ] ZIP/JSON export/import — TESTED for the pure layer; `BackupManager` rollback + ZIP-with-photos round trip untested
-5. [ ] Sharing + text import — TESTED for share text/Sharesheet/clipboard/TXT + pasted/TXT import. Incoming Android share intent (`ACTION_SEND text/plain`) IMPLEMENTED in PR #9, CI PENDING
+5. [ ] Sharing + text import — TESTED: share text/Sharesheet/clipboard/TXT, pasted/TXT import, and incoming Android share intent `ACTION_SEND text/plain` (PR #9 merged `664352c`). Manual device check pending
 6. [ ] Fix existing import bug — BLOCKED, WAITING FOR USER FILE (F3)
 7. [ ] Six themes + custom colours — TESTED; hard-coded colour scan of modernization-only UI files done by agent #11: clean
 8. [ ] Safe APK updates — IN PROGRESS: versioning/build date, migration safety tests (`301f98e`) and env-var signing config (`0e733b4`) TESTED; release signing with the original key BLOCKED (F2); update-over-install not tested
@@ -49,13 +48,13 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 
 ## C. Implementation status and decisions
 
-**Global state (04:50 UTC):** `modernization` @ `0e733b4` code (merge of PR #8) + docs `1ff922f` + this docs commit. Open: PR #9 (`task5-share-intent`, draft, CI running). PR #1 draft (do not merge).
+**Global state (05:05 UTC):** `modernization` @ `664352c` (merge of PR #9) + this docs commit. No open feature PRs. PR #1 draft (do not merge).
 
 - Task 1: `domain/IngredientLineParser.kt`, `ui/recipes/BulkIngredientsDialog.kt`. Risk: if `vm.addCustomProduct` never calls back, remaining rows are not added.
 - Task 2: cuisine removed from domain/UI/seed/README; `TagMultiSelect` at the bottom of the form. DB column `recipes.cuisine` and backup v1 field kept on purpose (non-destructive).
 - Task 3: `menu_entries.position`, non-unique `(date, slot)` index, add/replace/reorder/move with renumbering. `MenuGeneratorUseCase` fills only empty meals and counts every dish as used; `ShoppingListUseCase` sums every entry. Tests: `domain/MultiDishMealTest.kt`.
 - Task 4: format v2 (`domain/backup/BackupFormat.kt`, `ImportAnalysis.kt`), `data/files/BackupManager.kt` staging (`stage`/`stageStream` -> `StagedImport`) + `commit(staged, DuplicateMode)` in one transaction + photo rollback + read-back verification; `BackupAnalyzerTest`, `BackupJsonTest`.
-- Task 5: share text/Sharesheet/clipboard/TXT, `RecipeTextParser` + `TextImportDialog(onDismiss, onSaved, initialText)`. **New (PR #9):** `ui/SharedTextIntent.kt` (`SharedTextIntent.textOf/streamOf/combine`, `SharedTextInbox.offer/take`), `MainActivity.receiveSharedText` (onCreate when `savedInstanceState == null`, and `onNewIntent`; a shared TXT stream is read with `readTextFromUri`), `RecipesRoute` opens the dialog pre-filled (`key(importInitial)`), manifest `ACTION_SEND` + `text/plain` filter. Test: `ui/SharedTextIntentTest.kt` (Robolectric, 9 tests).
+- Task 5: share text/Sharesheet/clipboard/TXT, `RecipeTextParser` + `TextImportDialog(onDismiss, onSaved, initialText)`. Share intent (PR #9): `ui/SharedTextIntent.kt` (`SharedTextIntent.textOf/streamOf/combine`, `SharedTextInbox.offer/take`), `MainActivity.receiveSharedText` (onCreate when `savedInstanceState == null`, and `onNewIntent`; a shared TXT stream is read with `readTextFromUri`), `RecipesRoute` opens the dialog pre-filled (`key(importInitial)`), manifest `ACTION_SEND` + `text/plain` filter. Test: `ui/SharedTextIntentTest.kt` (Robolectric, 9 tests, passed).
 - Task 7: `ui/theme/ThemePalettes.kt`, `Theme.kt`, `ui/settings/AppearanceSection.kt`. Scan for `Color(0x` / `Color.White|Black|Gray|Red|Green` in all added lines of the PR #1 diff outside `ui/theme/`: no hits.
 - Task 8 / DB: `AppDatabase.MIGRATION_1_2` (additive only), `DatabaseSafety.backupBeforeMigration` (copy to `filesDir/db_backups`, keeps 5). `data/db/MigrationV1toV2Test.kt` builds v1 with Room 2.6's SQL for the `87a602d` entities, migrates with Room's validation, reads all data back; failing migration leaves v1 untouched and still upgradable; backup taken for v1 and skipped for v2; fresh install.
 
@@ -64,8 +63,8 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 | (#11) Migration test with hand-written v1 SQL instead of exported schema | No v1 schema JSON exists; Room's post-migration validation checks the full v2 schema | `be55327` |
 | (#11) Signing only when `HOMEMENU_KEYSTORE_FILE` exists | No behaviour change without the user's key; never generate a replacement key | `8f69a02` |
 | (#11) Merge PR #7 although run 44009302845 failed on API 34 | Failure = F7 `product_search` test (branch predates the F7 fix); same head green in run 44009297706; change is test-only | `301f98e` |
-| (#12) Shared text passed through a process-wide `SharedTextInbox` object instead of new nav/route parameters | Keeps `AppNav.kt`/`AppRoot` signatures untouched (fewer full-file rewrites without a terminal); a share launches a fresh MainActivity whose start destination is Recipes anyway. Limitation: if the process dies between receiving and showing the text, the share is lost (user shares again); once shown, the text survives in `rememberSaveable` | `c97247e`, `8d6489a` |
-| (#12) No `launchMode` change | Changing the launch mode alters task behaviour for all users; `onNewIntent` is handled for the cases where it is delivered | `c97247e` |
+| (#12) Shared text passed through a process-wide `SharedTextInbox` object instead of new nav/route parameters | Keeps `AppNav.kt`/`AppRoot` signatures untouched; a share launches a fresh MainActivity whose start destination is Recipes. Limitation: if the process dies between receiving and showing the text, the share is lost (user shares again); once shown, the text survives in `rememberSaveable` | `c97247e`, `8d6489a` |
+| (#12) No `launchMode` change | Would alter task behaviour for all users; `onNewIntent` is handled where delivered | `c97247e` |
 
 ---
 
@@ -73,9 +72,9 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 
 - `main` @ `2ceef75` (green, CI #11).
 - Agents #1-#11: see earlier versions of this file.
-- Agent #12 (2026-11-17 04:30-04:50 UTC):
-  - `task5-share-intent` from `1ff922f`: `c97247e` (manifest +7, MainActivity +30, new SharedTextIntent.kt + SharedTextIntentTest.kt; [skip ci]), `8d6489a` (RecipesScreen.kt +24/-11, RecipesRoute only) -> PR #9 (draft). Diff stats verified: no unintended deletions.
-  - this docs commit on `modernization` [skip ci].
+- Agent #12 (2026-11-17 04:30-05:05 UTC):
+  - `task5-share-intent` from `1ff922f`: `c97247e` (manifest +7, MainActivity +30, new SharedTextIntent.kt + SharedTextIntentTest.kt; [skip ci]), `8d6489a` (RecipesScreen.kt +24/-11, RecipesRoute only) -> PR #9 -> merged into `modernization` as `664352c` (merge commit, no force-push).
+  - docs on `modernization`: `ff71109` and this commit, both [skip ci].
 
 ---
 
@@ -84,17 +83,17 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED / VERIFIED / BLOCKED.
 | Commit | Run | build | API 29 | API 34 |
 |---|---|---|---|---|
 | `2c61d54` (modernization, F7 merge) | 44009586697 (push) / 44009593125 (PR #1) | green | green | green |
-| `301f98e` (modernization, PR #7 merge) | 44011601415 (push) | **FAILED**: `testDebugUnitTest`, 11 of 119 failed, all Robolectric tests (`MigrationV1toV2Test` x5, `ComposeScreensTest` x6) with `java.io.FileNotFoundException at HttpURLConnection` = Robolectric could not download its android-all jar (F11, infrastructure). Instrumented skipped | — | — |
+| `301f98e` (modernization, PR #7 merge) | 44011601415 (push) | FAILED: all Robolectric tests, `FileNotFoundException at HttpURLConnection` (F11, infrastructure) | skipped | skipped |
 | `301f98e` | 44011607777 (PR #1) | green | green | green |
 | `0e733b4` (modernization, PR #8 merge) | 44011615875 (push) / 44011622260 (PR #1) | green | green | green |
-
-Conclusion: current `modernization` code (`0e733b4`) is fully green; the one red run is F11, not a code failure.
+| `8d6489a` (PR #9 head) | 44019000484 (push) | green | green | green |
+| `8d6489a` (PR #9 head) | 44019021821 (PR) | green (unit + Robolectric + lint) | green | green |
 
 ## PENDING TESTS AND CHECKS
 
 | Commit | What | How to read | Status |
 |---|---|---|---|
-| `8d6489a` (PR #9 head, branch `task5-share-intent`) | runs 44019000484 (push), 44019021821 (PR); started 04:42 UTC | `actions_list list_workflow_runs` branch `task5-share-intent`; failures via `get_job_logs job_id return_content tail_lines` or `run_id failed_only` | PENDING |
+| `664352c` (merge of PR #9 into modernization) | push CI on `modernization` + PR #1 CI, started ~05:03 UTC | `actions_list list_workflow_runs` branch `modernization`; failures via `get_job_logs job_id return_content tail_lines` | PENDING (expected green: same tree as tested PR head plus docs) |
 
 Never record these as passed until read. If `build` fails only with `FileNotFoundException at HttpURLConnection` in Robolectric tests, it is F11: `rerun_failed_jobs`.
 
@@ -102,21 +101,21 @@ Never record these as passed until read. If `build` fails only with `FileNotFoun
 
 ## F. Blockers and known issues
 
-- **F2 Signing (Task 8, user):** need how the installed app was installed and the original keystore (to GitHub Secrets, e.g. `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`; a CI step decodes it to a file, exports the `HOMEMENU_*` env vars and runs `assembleRelease`). If the app came from CI (random debug key), an update over it is impossible: export a ZIP backup first, then reinstall.
-- **F3 Import bug file (Task 6, user):** waiting for the failing file + error text. Status `BLOCKED — WAITING FOR USER FILE`.
+- **F2 Signing (Task 8, user):** need how the installed app was installed and the original keystore (to GitHub Secrets, e.g. `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`; a CI step decodes it to a file, exports the `HOMEMENU_*` env vars and runs `assembleRelease`). If the app came from CI (random debug key), an update over it is impossible: export a ZIP backup first, then reinstall. Requested from the user again 2026-11-17 (agent #12).
+- **F3 Import bug file (Task 6, user):** `BLOCKED — WAITING FOR USER FILE`: the failing file + error text. Requested again 2026-11-17 (agent #12).
 - **F5** `TEST_REPORT.md` outdated (run #10).
-- **F7** flaky API 34 test: fix merged (`2c61d54`); runs on `modernization` since then green.
+- **F7** flaky API 34 test: fix merged (`2c61d54`); green since.
 - **F9** one unexplained `build` failure on `8e68c59`; not seen since.
 - **F10** no terminal/Gradle/git in the sandbox; use the reconstruction + hash check from section A.
-- **F11 (new, agent #12)** Robolectric sometimes fails to download `android-all` from Maven in CI (`FileNotFoundException at HttpURLConnection`), failing every Robolectric test at once. Seen once (run 44011601415). Fix: re-run failed jobs. Possible hardening later: cache `~/.m2/repository/org/robolectric` in `android.yml` or set `robolectric.offline` with a pre-fetched jar.
+- **F11** Robolectric sometimes fails to download `android-all` in CI, failing every Robolectric test at once (seen once, run 44011601415). Fix: re-run failed jobs. Possible hardening: cache `~/.m2/repository/org/robolectric` in `android.yml`.
 
 ---
 
 ## G. NEXT AGENT — START HERE
 
-1. **State:** `modernization` @ `0e733b4` (code, green) + docs. Tasks 1, 2, 3, 7 TESTED; 4 pure layer TESTED; 5 TESTED + share intent IMPLEMENTED (PR #9); 6 BLOCKED (F3); 8 IN PROGRESS, signing BLOCKED (F2). Stage 2 not complete.
-2. **First:** read the PR #9 runs in PENDING. Compile risks to check if red: `IntentCompat.getParcelableExtra` (core 1.13.1), `kotlinx.coroutines.flow.getAndUpdate`, `override fun onNewIntent(intent: Intent)` (activity 1.9.0), lint on the new intent filter. When `build` + both instrumented are green on the head: mark PR #9 ready, merge into `modernization`, set Task 5 to TESTED.
-3. **Then:** `BackupManager` failed-import rollback + ZIP-with-photo round trip (Robolectric, new test file: `stageStream` on a ZIP built in the test, `commit` with each `DuplicateMode`); tag UI tests (Task 2); bulk dialog Robolectric test (Task 1); update `TEST_REPORT.md` (F5) and `AGENT.md`; F11 hardening; Task 8 CI `assembleRelease` with secrets after the user supplies the key; Task 6 after the user file.
+1. **State:** `modernization` @ `664352c` + docs. Tasks 1, 2, 3, 5, 7 TESTED; 4 pure layer TESTED; 6 BLOCKED (F3); 8 IN PROGRESS, signing BLOCKED (F2). Stage 2 not complete.
+2. **First:** read the `664352c` runs in PENDING and record them.
+3. **Then (in this order):** `BackupManager` round trip + rollback (new Robolectric test file: build a ZIP with a real JPEG in the test, `stageStream` -> `commit` for each `DuplicateMode`, then force a failure inside `commit` and check that no recipe and no copied photo remain); tag UI tests (Task 2); bulk dialog Robolectric test (Task 1); update `TEST_REPORT.md` (F5) and `AGENT.md`; F11 hardening; Task 8 CI `assembleRelease` with secrets after the user supplies the key; Task 6 after the user file.
 4. **Precautions:** never change `applicationId`; no `fallbackToDestructiveMigration`; keep `recipes.cuisine`; do not merge PR #1 until all tasks are verified; no secrets in git; verify every write's diff stats.
 
 ---
@@ -127,6 +126,6 @@ Never record these as passed until read. If `build` fails only with `FileNotFoun
 - Task 2: tags at the very bottom; select several, create one, remove one; no "Кухня" anywhere.
 - Task 3: Menu -> one meal with 3 dishes -> reorder, replace, remove -> restart -> same list.
 - Task 4: Settings -> export ZIP and JSON -> import each back -> preview counts/duplicates -> Skip / Update / Copies -> photos and menu restored.
-- Task 5: Share -> "Как текст", "Скопировать текст", "Сохранить как TXT"; Recipes -> "Из текста" -> paste -> preview -> save. After PR #9: in Telegram/WhatsApp/notes select a recipe text -> Share -> «Домашнее меню» -> the «Рецепт из текста» dialog opens with the text -> preview -> save.
+- Task 5: Share -> "Как текст", "Скопировать текст", "Сохранить как TXT"; Recipes -> "Из текста" -> paste -> preview -> save. In Telegram/WhatsApp/notes select a recipe text -> Share -> «Домашнее меню» -> the «Рецепт из текста» dialog opens with the text -> preview -> save.
 - Task 7: Settings -> "Оформление" -> each of the 6 themes applies at once; "Свои цвета" -> restart -> kept; reset.
 - Task 8: Settings -> "О приложении" shows 1.1.0, сборка 2, дата сборки. Update over the installed app only with the same signing key (F2).
