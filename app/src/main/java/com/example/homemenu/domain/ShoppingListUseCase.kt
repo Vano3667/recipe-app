@@ -54,15 +54,37 @@ class ShoppingListUseCase @Inject constructor(
 
     fun build(dishes: List<PlannedDish>): List<DepartmentGroup> = groupByDepartment(aggregate(dishes))
 
-    fun shareText(title: String, groups: List<DepartmentGroup>, bought: Set<String>): String = buildString {
+    /**
+     * Plain-text list for messengers (WhatsApp, Telegram, e-mail). Uses ☐/☑ symbols because neither
+     * WhatsApp messages nor Android share intents support interactive checklists.
+     *
+     * @param onlyRemaining when true, bought items and departments with nothing left are omitted.
+     */
+    fun shareText(
+        title: String,
+        groups: List<DepartmentGroup>,
+        bought: Set<String>,
+        onlyRemaining: Boolean = false,
+    ): String = buildString {
         appendLine("🛒 $title")
+        val total = groups.sumOf { it.items.size }
+        val done = groups.sumOf { g -> g.items.count { it.key in bought } }
         for (g in groups) {
+            val items = if (onlyRemaining) g.items.filter { it.key !in bought } else g.items
+            if (items.isEmpty()) continue
             appendLine()
             appendLine(g.department.title + ":")
-            for (item in g.items) {
+            for (item in items) {
                 val mark = if (item.key in bought) "☑" else "☐"
                 appendLine("$mark ${item.product.name} — ${item.text}")
             }
+        }
+        if (onlyRemaining && total > 0 && done == total) {
+            appendLine()
+            appendLine("✅ Всё куплено")
+        } else if (!onlyRemaining && done > 0) {
+            appendLine()
+            appendLine("Куплено: $done из $total")
         }
     }.trimEnd()
 }
