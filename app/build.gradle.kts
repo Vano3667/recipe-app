@@ -30,6 +30,22 @@ android {
         buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
     }
 
+    // Release signing (Task 8). The keystore and its passwords are never committed: they come from
+    // environment variables (locally or from GitHub Secrets in CI). Without them the release build stays
+    // unsigned, exactly as before, and debug builds are not affected at all.
+    // An update installs over the existing app only if it is signed with the SAME key as the installed APK.
+    val releaseKeystore = System.getenv("HOMEMENU_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.isFile }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("HOMEMENU_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("HOMEMENU_KEY_ALIAS")
+                keyPassword = System.getenv("HOMEMENU_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -37,6 +53,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
