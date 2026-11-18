@@ -9,7 +9,8 @@ import kotlin.math.roundToLong
 
 /** Rounded-up amount. [approximate] = the exact value was fractional, so it is shown as "~N". */
 data class ScaledAmount(val value: Long, val approximate: Boolean) {
-    fun format(unit: MeasureUnit): String = "${if (approximate) "~" else ""}$value ${unit.label}"
+    fun format(unit: MeasureUnit): String =
+        if (unit.isAmountless) unit.label else "${if (approximate) "~" else ""}$value ${unit.label}"
 }
 
 data class ScaledIngredient(val ingredient: Ingredient, val amount: ScaledAmount) {

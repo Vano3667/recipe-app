@@ -42,7 +42,7 @@ class Seeder @Inject constructor(private val db: AppDatabase) {
             val id = db.recipeDao().insertRecipe(
                 RecipeEntity(
                     name = r.name, cookingTimeMin = r.timeMin, difficulty = r.difficulty, category = r.category,
-                    cuisine = r.cuisine, calories = r.calories, servings = r.servings,
+                    calories = r.calories, servings = r.servings,
                     createdAt = now - (SeedData.recipes.size - index) * 60_000L,
                 ),
             )

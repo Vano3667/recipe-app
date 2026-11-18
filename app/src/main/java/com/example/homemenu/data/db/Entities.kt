@@ -1,5 +1,6 @@
 package com.example.homemenu.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -33,11 +34,19 @@ data class RecipeEntity(
     val cookingTimeMin: Int = 0,
     val difficulty: String = "EASY",
     val category: String = "DINNER",
+    /**
+     * Legacy column from DB v1 («Кухня»). The cuisine classification was removed from the app;
+     * the column stays so that existing databases migrate without rebuilding the table, and old values are kept.
+     */
     val cuisine: String = "",
     val calories: Int? = null,
     val servings: Int = 1,
     val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
+    // --- v2 ---
+    @ColumnInfo(defaultValue = "") val description: String = "",
+    @ColumnInfo(defaultValue = "0") val prepTimeMin: Int = 0,
+    val ovenTempC: Int? = null,
 )
 
 @Entity(
@@ -81,14 +90,19 @@ data class StepEntity(
 )
 data class RecipeTagCrossRef(val recipeId: Long, val tagId: Long)
 
-/** No FK to recipes on purpose: deleting a scheduled recipe asks the user to clear its slots first. */
-@Entity(tableName = "menu_entries", indices = [Index(value = ["date", "slot"], unique = true), Index("recipeId")])
+/**
+ * One dish of a meal. Since v2 a meal (date + slot) may contain several dishes, ordered by [position];
+ * the (date, slot) index is no longer unique. No FK to recipes on purpose: deleting a scheduled recipe
+ * asks the user to clear its slots first.
+ */
+@Entity(tableName = "menu_entries", indices = [Index(value = ["date", "slot"]), Index("recipeId")])
 data class MenuEntryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: String,
     val slot: String,
     val recipeId: Long,
     val servings: Int,
+    @ColumnInfo(defaultValue = "0") val position: Int = 0,
 )
 
 @Entity(tableName = "shopping_checks")
@@ -101,6 +115,11 @@ data class UserSettingsEntity(
     @PrimaryKey val id: Int = 0,
     val themeMode: String = "SYSTEM",
     val demoSeeded: Boolean = false,
+    // --- v2 ---
+    /** Selected colour theme (AppThemeId name). LEGACY = the v1 look that follows [themeMode]. */
+    @ColumnInfo(defaultValue = "LEGACY") val themeId: String = "LEGACY",
+    /** User colour overrides as JSON (see CustomColors), null = none. */
+    val customColors: String? = null,
 )
 
 data class IngredientWithProduct(

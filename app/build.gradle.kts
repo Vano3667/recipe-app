@@ -1,3 +1,6 @@
+import java.time.LocalDate
+import java.time.ZoneOffset
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,19 +9,41 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+// Build date shown in Settings > «О приложении». UTC, so every machine produces the same format.
+val buildDate: String = LocalDate.now(ZoneOffset.UTC).toString()
+
 android {
     namespace = "com.example.homemenu"
     compileSdk = 34
 
     defaultConfig {
+        // Never change applicationId: updates over the installed app depend on it.
         applicationId = "com.example.homemenu"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // Increase versionCode by 1 for every APK given to the user.
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("ru")
+        buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
+    }
+
+    // Release signing (Task 8). The keystore and its passwords are never committed: they come from
+    // environment variables (locally or from GitHub Secrets in CI). Without them the release build stays
+    // unsigned, exactly as before, and debug builds are not affected at all.
+    // An update installs over the existing app only if it is signed with the SAME key as the installed APK.
+    val releaseKeystore = System.getenv("HOMEMENU_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.isFile }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("HOMEMENU_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("HOMEMENU_KEY_ALIAS")
+                keyPassword = System.getenv("HOMEMENU_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -28,6 +53,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

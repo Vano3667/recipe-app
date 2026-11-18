@@ -65,6 +65,12 @@ interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE id = :id")
     suspend fun get(id: Long): RecipeFull?
 
+    @Query("SELECT * FROM recipes WHERE id = :id")
+    suspend fun getEntity(id: Long): RecipeEntity?
+
+    @Query("SELECT id, name FROM recipes")
+    suspend fun getNames(): List<RecipeName>
+
     @Query("SELECT COUNT(*) FROM recipes")
     suspend fun count(): Int
 
@@ -96,34 +102,43 @@ interface RecipeDao {
     suspend fun clearTags(recipeId: Long)
 }
 
+data class RecipeName(val id: Long, val name: String)
+
 @Dao
 interface MenuDao {
-    @Query("SELECT * FROM menu_entries WHERE date BETWEEN :from AND :to ORDER BY date")
+    @Query("SELECT * FROM menu_entries WHERE date BETWEEN :from AND :to ORDER BY date, position, id")
     fun observeRange(from: String, to: String): Flow<List<MenuEntryEntity>>
 
-    @Query("SELECT * FROM menu_entries WHERE date BETWEEN :from AND :to")
+    @Query("SELECT * FROM menu_entries WHERE date BETWEEN :from AND :to ORDER BY date, position, id")
     suspend fun getRange(from: String, to: String): List<MenuEntryEntity>
 
-    @Query("SELECT * FROM menu_entries")
+    @Query("SELECT * FROM menu_entries ORDER BY date, slot, position, id")
     suspend fun getAll(): List<MenuEntryEntity>
 
-    @Query("SELECT * FROM menu_entries WHERE date = :date AND slot = :slot LIMIT 1")
-    suspend fun find(date: String, slot: String): MenuEntryEntity?
+    /** All dishes of one meal in display order. */
+    @Query("SELECT * FROM menu_entries WHERE date = :date AND slot = :slot ORDER BY position, id")
+    suspend fun getSlot(date: String, slot: String): List<MenuEntryEntity>
 
     @Query("SELECT * FROM menu_entries WHERE id = :id")
     suspend fun get(id: Long): MenuEntryEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(entry: MenuEntryEntity): Long
+    @Insert
+    suspend fun insert(entry: MenuEntryEntity): Long
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertAllIgnore(entries: List<MenuEntryEntity>)
+    @Insert
+    suspend fun insertAll(entries: List<MenuEntryEntity>)
 
     @Update
     suspend fun update(entry: MenuEntryEntity)
 
+    @Update
+    suspend fun updateAll(entries: List<MenuEntryEntity>)
+
     @Query("DELETE FROM menu_entries WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT COUNT(*) FROM menu_entries")
+    suspend fun count(): Int
 
     @Query("SELECT COUNT(*) FROM menu_entries WHERE recipeId = :recipeId")
     suspend fun countForRecipe(recipeId: Long): Int

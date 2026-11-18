@@ -3,6 +3,7 @@ package com.example.homemenu.di
 import android.content.Context
 import androidx.room.Room
 import com.example.homemenu.data.db.AppDatabase
+import com.example.homemenu.data.db.DatabaseSafety
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -24,10 +25,13 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
+        // Copy the old database aside before Room runs a schema migration on it.
+        DatabaseSafety.backupBeforeMigration(context, AppDatabase.NAME, AppDatabase.VERSION)
+        return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
             .addMigrations(*AppDatabase.MIGRATIONS)
             .build()
+    }
 
     @Provides
     @Singleton

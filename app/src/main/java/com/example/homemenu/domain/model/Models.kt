@@ -3,7 +3,10 @@ package com.example.homemenu.domain.model
 import java.time.LocalDate
 
 enum class MeasureUnit(val label: String) {
-    G("г"), ML("мл"), PCS("шт"), TBSP("ст. л."), TSP("ч. л."), PINCH("щепотка");
+    G("г"), ML("мл"), PCS("шт"), TBSP("ст. л."), TSP("ч. л."), PINCH("щепотка"), TO_TASTE("по вкусу");
+
+    /** «По вкусу»: the amount is not used (stored as 0, shown as the label only). */
+    val isAmountless: Boolean get() = this == TO_TASTE
 
     companion object {
         fun parse(code: String): MeasureUnit = when (code.lowercase()) {
@@ -13,6 +16,7 @@ enum class MeasureUnit(val label: String) {
             "tbsp" -> TBSP
             "tsp" -> TSP
             "pinch" -> PINCH
+            "to_taste", "totaste" -> TO_TASTE
             else -> entries.firstOrNull { it.name.equals(code, ignoreCase = true) } ?: G
         }
     }
@@ -105,7 +109,6 @@ data class Recipe(
     val cookingTimeMin: Int = 0,
     val difficulty: Difficulty = Difficulty.EASY,
     val category: Category = Category.DINNER,
-    val cuisine: String = "",
     val calories: Int? = null,
     val servings: Int = 1,
     val ingredients: List<Ingredient> = emptyList(),
@@ -113,14 +116,19 @@ data class Recipe(
     val notes: String = "",
     val tags: List<Tag> = emptyList(),
     val createdAt: Long = 0L,
+    val description: String = "",
+    val prepTimeMin: Int = 0,
+    val ovenTempC: Int? = null,
 )
 
+/** One dish inside a meal. A meal (date + slot) can hold several dishes ordered by [position]. */
 data class MenuEntry(
     val id: Long,
     val date: LocalDate,
     val slot: MealSlot,
     val recipeId: Long,
     val servings: Int,
+    val position: Int = 0,
 )
 
 enum class ThemeMode(val title: String) {
@@ -130,9 +138,3 @@ enum class ThemeMode(val title: String) {
         fun parse(code: String?) = entries.firstOrNull { it.name.equals(code, true) } ?: SYSTEM
     }
 }
-
-val DEFAULT_CUISINES = listOf(
-    "русская", "европейская", "итальянская", "греческая", "узбекская",
-    "американская", "французская", "грузинская", "японская", "китайская",
-    "мексиканская", "индийская", "тайская",
-)

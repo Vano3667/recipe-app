@@ -46,6 +46,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.homemenu.BuildConfig
 import com.example.homemenu.domain.model.ThemeMode
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.example.homemenu.domain.backup.DuplicateMode
+import com.example.homemenu.domain.backup.ImportPreview
+import com.example.homemenu.domain.backup.ImportReport
 import java.time.LocalDate
 
 @Composable
@@ -53,26 +62,120 @@ fun SettingsRoute(vm: SettingsViewModel = hiltViewModel()) {
     val theme by vm.theme.collectAsState()
     val busy by vm.busy.collectAsState()
     val message by vm.message.collectAsState()
+    val staged by vm.staged.collectAsState()
+    val report by vm.report.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.messageShown() }
     }
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        uri?.let(vm::export)
+    val exportZipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        uri?.let(vm::exportZip)
+    }
+    val exportJsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let(vm::exportJson)
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let(vm::import)
+        uri?.let(vm::stageImport)
     }
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }, containerColor = MaterialTheme.colorScheme.background) { padding ->
         SettingsContent(
             theme = theme, busy = busy, modifier = Modifier.padding(padding),
             onTheme = vm::setTheme,
-            onExport = { exportLauncher.launch("home-menu-backup-${LocalDate.now()}.zip") },
-            onImport = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed")) },
+            onExport = { exportZipLauncher.launch("home-menu-backup-${LocalDate.now()}.zip") },
+            onExportJson = { exportJsonLauncher.launch("home-menu-backup-${LocalDate.now()}.json") },
+            onImport = {
+                importLauncher.launch(
+                    arrayOf("application/zip", "application/x-zip-compressed", "application/json", "text/plain", "application/octet-stream"),
+                )
+            },
+            appearance = { AppearanceSection() },
         )
     }
+    staged?.let { s ->
+        ImportPreviewDialog(preview = s.preview, onConfirm = vm::confirmImport, onCancel = vm::cancelImport)
+    }
+    report?.let { r -> ImportReportDialog(report = r, onDismiss = vm::reportShown) }
 }
 
+@Composable
+fun ImportPreviewDialog(preview: ImportPreview, onConfirm: (DuplicateMode) -> Unit, onCancel: () -> Unit) {
+    var mode by remember { mutableStateOf(DuplicateMode.SKIP) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Импорт: проверьте данные") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Файл: ${preview.sourceKind}, версия формата ${preview.formatVersion}")
+                Text("Рецептов: ${preview.recipes} (новых: ${preview.newRecipes})")
+                Text("Ингредиентов: ${preview.ingredients}, шагов: ${preview.steps}, тегов: ${preview.tags}")
+                Text("Блюд в меню: ${preview.menuEntries}")
+                Text("Фото: ${preview.photosAvailable} из ${preview.photosReferenced}")
+                preview.warnings.forEach { Text("⚠ $it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                if (preview.duplicates.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Уже есть в приложении: ${preview.duplicates.size}", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        preview.duplicates.take(5).joinToString(", ") { it.name } + if (preview.duplicates.size > 5) "…" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Column(Modifier.selectableGroup()) {
+                        DuplicateMode.entries.forEach { m ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                                    .selectable(selected = mode == m, onClick = { mode = m }, role = Role.RadioButton)
+                                    .padding(vertical = 4.dp)
+                                    .testTag("duplicate_${m.name}"),
+                            ) {
+                                RadioButton(selected = mode == m, onClick = null)
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(m.title, style = MaterialTheme.typography.bodyLarge)
+                                    Text(m.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                    if (mode == DuplicateMode.UPDATE) {
+                        Text(
+                            "Внимание: совпадающие рецепты будут перезаписаны данными из файла.",
+                            color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(mode) }, modifier = Modifier.testTag("confirm_import")) { Text("Импортировать") }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Отмена") } },
+    )
+}
+
+@Composable
+fun ImportReportDialog(report: ImportReport, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (report.verified) "Импорт завершён" else "Импорт завершён с ошибками") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(report.summary())
+                if (report.verified) Text("Данные проверены: все рецепты сохранены в приложении.")
+                if (report.failed.isNotEmpty()) {
+                    Text("Не удалось проверить: " + report.failed.joinToString(", "), color = MaterialTheme.colorScheme.error)
+                }
+                report.warnings.forEach { Text("⚠ $it", style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("import_report_ok")) { Text("Готово") } },
+    )
+}
+
+/**
+ * [appearance] = content of the «Оформление» card (themes + custom colours), shown right below the
+ * light/dark card. Null hides the card, so tests that render SettingsContent without Hilt keep working.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsContent(
     theme: ThemeMode,
@@ -81,6 +184,8 @@ fun SettingsContent(
     onExport: () -> Unit,
     onImport: () -> Unit,
     modifier: Modifier = Modifier,
+    onExportJson: () -> Unit = {},
+    appearance: (@Composable () -> Unit)? = null,
 ) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
@@ -105,17 +210,30 @@ fun SettingsContent(
                         }
                     }
                 }
+                if (appearance != null) {
+                    Text(
+                        "Светлый и тёмный режим относятся к теме «Классическая». Другие темы — в разделе «Оформление» ниже.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            if (appearance != null) {
+                SettingsCard("Оформление") { appearance() }
             }
 
             SettingsCard("Резервная копия") {
                 Text(
-                    "Архив .zip с рецептами, меню и фотографиями. При импорте данные добавляются к существующим — ничего не удаляется.",
+                    "ZIP — архив с рецептами, меню, тегами и фотографиями. JSON — один файл, фото внутри. Перед импортом покажем, что будет добавлено, и спросим, что делать с совпадающими рецептами.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = onExport, enabled = !busy, modifier = Modifier.testTag("export_backup")) {
-                        Icon(Icons.Filled.FileUpload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Экспорт")
+                        Icon(Icons.Filled.FileUpload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Экспорт ZIP")
+                    }
+                    OutlinedButton(onClick = onExportJson, enabled = !busy, modifier = Modifier.testTag("export_json")) {
+                        Icon(Icons.Filled.FileUpload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("JSON")
                     }
                     OutlinedButton(onClick = onImport, enabled = !busy, modifier = Modifier.testTag("import_backup")) {
                         Icon(Icons.Filled.FileDownload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Импорт")
@@ -126,6 +244,8 @@ fun SettingsContent(
 
             SettingsCard("О приложении") {
                 Text("Домашнее меню · версия ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
+                Text("Сборка ${BuildConfig.VERSION_CODE}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("about_build"))
+                Text("Дата сборки ${BuildConfig.BUILD_DATE}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("about_build_date"))
                 Text(
                     "Рецепты, меню на неделю и список покупок. Работает полностью офлайн, данные хранятся только на устройстве.\nШрифты Lora и Nunito — SIL Open Font License. Иллюстрации нарисованы в коде (CC0).",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,

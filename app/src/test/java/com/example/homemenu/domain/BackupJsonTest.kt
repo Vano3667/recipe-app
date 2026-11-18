@@ -22,15 +22,16 @@ class BackupJsonTest {
         tags = listOf(BackupTag("Летнее", "yellow")),
         recipes = listOf(
             BackupRecipe(
-                id = 7, name = "Салат с буратой \"для души\"", photo = "p_7.jpg", cookingTimeMin = 15,
-                difficulty = "EASY", category = "LUNCH", cuisine = "Итальянская", calories = 320, servings = 2,
+                id = 7, name = "Салат с буратой \"для души\"", description = "Летний салат", photo = "p_7.jpg", cookingTimeMin = 15,
+                prepTimeMin = 10, ovenTempC = 180, difficulty = "EASY", category = "LUNCH", calories = 320, servings = 2,
                 ingredients = listOf(BackupIngredient("Сыр бурата", "G", "DAIRY", 125.0, "G"), BackupIngredient("Соль", amount = 1.0, unit = "PINCH")),
                 steps = listOf(BackupStep("Нарезать", "s_1.jpg"), BackupStep("Смешать")),
                 notes = "Многострочная\nзаметка 🍅", tags = listOf("Летнее"), createdAt = 123,
             ),
         ),
-        menu = listOf(BackupMenuEntry("2026-11-09", "LUNCH", 7, 3)),
-        settings = BackupSettings("DARK"),
+        menu = listOf(BackupMenuEntry("2026-11-09", "LUNCH", 7, 3), BackupMenuEntry("2026-11-09", "LUNCH", 8, 2, position = 1)),
+        settings = BackupSettings("DARK", themeId = "WARM_CREAM", customColors = null),
+        images = mapOf("p_7.jpg" to "AAEC"),
     )
 
     @Test fun `round trip keeps all data`() {
@@ -41,6 +42,14 @@ class BackupJsonTest {
 
     @Test fun `empty backup round trips`() {
         assertThat(BackupJson.decode(BackupJson.encode(BackupData()))).isEqualTo(BackupData())
+    }
+
+    @Test fun `v1 file with legacy cuisine field is still readable`() {
+        val text = """{"formatVersion":1,"recipes":[{"id":1,"name":"Борщ","cuisine":"русская","servings":4}],"menu":[{"date":"2026-11-09","slot":"LUNCH","recipeId":1,"servings":2}]}"""
+        val data = BackupJson.decode(text)
+        assertThat(data.version).isEqualTo(1)
+        assertThat(data.recipes.single().name).isEqualTo("Борщ")
+        assertThat(data.menu.single().position).isEqualTo(0)
     }
 
     @Test fun `unknown fields are ignored`() {
