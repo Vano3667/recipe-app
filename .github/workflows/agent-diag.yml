@@ -10,56 +10,61 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Analyze fixture
+      - name: Fixture stats
         run: |
-          git fetch origin main
           git show origin/main:recipes_from_budget_classic_1500kcal.json > /tmp/f.json
-          ls -l /tmp/f.json
-          head -c 3 /tmp/f.json | xxd
           python3 - <<'EOF'
           import json, collections
-          raw = open('/tmp/f.json','rb').read()
-          print('BOM', raw[:3] == b'\xef\xbb\xbf')
-          d = json.loads(raw.decode('utf-8-sig'))
-          def shape(x, depth=0, maxd=6):
-              if depth > maxd: return '...'
-              if isinstance(x, dict):
-                  return {k: shape(v, depth+1) for k, v in list(x.items())[:40]}
-              if isinstance(x, list):
-                  return [len(x), shape(x[0], depth+1) if x else None]
-              return type(x).__name__ + ':' + repr(x)[:60]
-          print('TOP TYPE', type(d).__name__)
-          print(json.dumps(shape(d), ensure_ascii=False, indent=1)[:12000])
+          d = json.load(open('/tmp/f.json', encoding='utf-8'))
+          R = d['recipes']
+          print('recipes', len(R), 'ingredients', sum(len(r['ingredients']) for r in R), 'steps', sum(len(r['steps']) for r in R))
+          nulls = collections.Counter(); keys = collections.Counter(); ikeys = collections.Counter()
+          for r in R:
+              for k, v in r.items():
+                  keys[k] += 1
+                  if v is None: nulls['recipe.' + k] += 1
+              for i in r['ingredients']:
+                  for k, v in i.items():
+                      ikeys[k] += 1
+                      if v is None: nulls['ing.' + k] += 1
+              for s in r['steps']:
+                  for k, v in s.items():
+                      if v is None: nulls['step.' + k] += 1
+          print('recipe keys', dict(keys)); print('ing keys', dict(ikeys)); print('nulls', dict(nulls))
+          print('units', collections.Counter(i['unit'] for r in R for i in r['ingredients']))
+          print('productUnits', collections.Counter(i['productUnit'] for r in R for i in r['ingredients']))
+          print('departments', collections.Counter(i['department'] for r in R for i in r['ingredients']))
+          print('null-amount units', collections.Counter(i['unit'] for r in R for i in r['ingredients'] if i['amount'] is None))
+          names = [r['name'] for r in R]
+          print('dup names', [n for n, c in collections.Counter(n.strip().lower() for n in names).items() if c > 1][:50])
+          print('distinct recipe names', len(set(n.strip().lower() for n in names)))
+          print('tags', collections.Counter(t for r in R for t in r['tags']))
+          print('empty ingredient names', sum(1 for r in R for i in r['ingredients'] if not (i['product'] or '').strip()))
+          print('empty steps', sum(1 for r in R for s in r['steps'] if not (s['text'] or '').strip()))
+          print('last recipe', R[-1]['id'], R[-1]['name'], [ (i['product'], i['amount'], i['unit']) for i in R[-1]['ingredients']])
           EOF
-          echo ==== HEAD 6000 ====
-          head -c 6000 /tmp/f.json
-          echo
-          echo ==== TAIL 1500 ====
-          tail -c 1500 /tmp/f.json
-  tree:
+  src:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dump sources
+        run: |
+          for f in app/src/main/java/com/example/homemenu/domain/model/Models.kt app/src/test/java/com/example/homemenu/domain/BackupJsonTest.kt app/build.gradle.kts .github/workflows/android.yml; do echo "==== FILE $f"; cat -n "$f"; done
+          echo ==== BackupManager tail; sed -n '488,540p' app/src/main/java/com/example/homemenu/data/files/BackupManager.kt | cat -n
+          echo ==== tests using Robolectric DB; grep -rln 'inMemoryDatabaseBuilder\|Robolectric' app/src/test | head
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dump docs
+        run: |
+          for f in DEVELOPMENT_HANDOFF.md AGENT.md docs/handoff/NEXT_AGENT_PROMPT.md docs/handoff/2026-11-17-session-helen.md "new job after apk is finished"; do echo "==== FILE $f"; cat "$f"; done
+  prompt:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Tree and divergence
+      - name: Dump prompt
         run: |
-          git fetch origin main
-          git ls-files | grep -v '^recipes_from' 
-          echo ==== main..HEAD ====
-          git log --oneline origin/main..HEAD | wc -l
-          echo ==== HEAD..main ====
-          git log --oneline HEAD..origin/main
-          echo ==== diff stat main vs HEAD ====
-          git diff --stat origin/main HEAD | tail -80
-          echo ==== merge-base ====
-          git merge-base origin/main HEAD
-  src:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Dump import sources
-        run: |
-          for f in $(ls app/src/main/java/com/example/homemenu/domain/backup/*.kt app/src/main/java/com/example/homemenu/data/files/*.kt); do echo "==== FILE $f"; cat -n "$f"; done
-          echo ==== GREP ====
-          grep -rn -i 'json\|importText\|TextImport' app/src/main/java --include=*.kt | grep -v '^app/src/main/java/com/example/homemenu/domain/backup' | head -150
+          git show 'origin/main:recipe_app_autonomous_development_prompt (1).md' | grep -n '' | sed 's/^/P:/'
