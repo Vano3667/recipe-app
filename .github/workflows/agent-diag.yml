@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Dump sources
+        with:
+          fetch-depth: 0
+      - name: Dump docs
         run: |
-          B=app/src/main/java/com/example/homemenu
-          echo '==== BM 120-276'; sed -n '120,276p' $B/data/files/BackupManager.kt
-          for f in $B/data/files/PhotoStorage.kt $B/data/db/AppDatabase.kt $B/data/db/Daos.kt $B/data/Mappers.kt $B/ui/recipes/IngredientOrder.kt; do echo "==== FILE $f"; cat "$f"; done
-          echo '==== MIG head'; sed -n '1,90p' app/src/test/java/com/example/homemenu/data/db/MigrationV1toV2Test.kt
+          echo '==== README modernization'; git show origin/modernization:README.md
+          echo '==== README main'; git show origin/main:README.md | head -20
           echo '==== END'
