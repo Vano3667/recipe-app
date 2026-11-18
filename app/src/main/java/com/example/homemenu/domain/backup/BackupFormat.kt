@@ -1,5 +1,6 @@
 package com.example.homemenu.domain.backup
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -14,6 +15,11 @@ import kotlinx.serialization.json.jsonPrimitive
  *  v2 — app 1.1: + manifest.json with SHA-256 of every file, recipe description / prep time / oven temperature,
  *       dish order inside a meal, appearance settings, optional Base64 images for the standalone JSON export.
  * The reader accepts every version from 1 to [BACKUP_FORMAT_VERSION].
+ *
+ * Files written by other tools (or by hand) may contain explicit `null` for fields that have a default here,
+ * e.g. `"cookingTimeMin": null`, `"amount": null` for "to taste" ingredients. The reader treats such a null
+ * as "use the default" (see [BackupJson.json]); the real-world fixture `recipes_from_budget_classic_1500kcal.json`
+ * depends on this.
  */
 const val BACKUP_FORMAT_VERSION = 2
 const val BACKUP_FORMAT_ID = "home-menu-backup"
@@ -34,14 +40,14 @@ data class BackupProduct(
 @Serializable
 data class BackupTag(val name: String, val color: String, val custom: Boolean = true)
 
-/** Ingredient order = order in the list. */
+/** Ingredient order = order in the list. A missing/null [amount] (e.g. unit TO_TASTE) is read as 0. */
 @Serializable
 data class BackupIngredient(
     val product: String,
     val productUnit: String = "G",
     val department: String = "OTHER",
-    val amount: Double,
-    val unit: String,
+    val amount: Double = 0.0,
+    val unit: String = "G",
 )
 
 /** [photo] is a file name inside photos/ (zip) or a key of [BackupData.images] (json), never a device path. */
@@ -118,11 +124,17 @@ data class BackupManifest(
 )
 
 object BackupJson {
+    /**
+     * [coerceInputValues]: an explicit `null` for a non-nullable property that has a default is read as that
+     * default instead of failing the whole import (Task 6 / user check 23.2).
+     */
+    @OptIn(ExperimentalSerializationApi::class)
     val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
         explicitNulls = false
+        coerceInputValues = true
     }
 
     fun encode(data: BackupData): String = json.encodeToString(BackupData.serializer(), data)
