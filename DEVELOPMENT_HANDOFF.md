@@ -3,7 +3,7 @@
 Persistent continuation guide for AI coding agents working on `Vano3667/recipe-app`.
 Read this file first, then `AGENT.md`, `manual user checks.md` (user test results, Section 23) and
 `recipe_app_autonomous_development_prompt (1).md` (full specification).
-Last updated: 2026-11-18 ~02:45 UTC (agent Jordan, monday.com). Session notes in `docs/handoff/` are merged here.
+Last updated: 2026-11-18 ~02:50 UTC (agent Jordan, monday.com). Session notes in `docs/handoff/` are merged here.
 
 ---
 
@@ -81,8 +81,8 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED (CI green) / VERIFIED
 ## D. Git history (this session, 2026-11-18)
 
 - `agent-diag` from `modernization`: diagnostics workflow only (`63ad8b9` ... `3344c7f`).
-- `main` `02e05f8`: this handoff (docs).
-- `task6-json-import-fix` from `modernization` `014a1d7`: `47a6c79` fix(import); `401f2bf` handoff; `b6a37c9` merge of `main` (PR #13); `51bf521` fixture tests; `a0dd4cb` test fix; then this docs commit. Merged into `modernization` (PR), then `modernization` into `main` (PR).
+- `task6-json-import-fix` from `modernization` `014a1d7`: `47a6c79` fix(import); `401f2bf` handoff; `b6a37c9` merge of `main` (PR #13); `51bf521` fixture tests; `a0dd4cb` test fix; `77a369a` docs (README announcement, handoff, AGENT.md).
+- PR #14 -> `modernization` merged as `6ae5d81`. PR #1 `modernization` -> `main` merged as `4989e62` (main now contains all Stage 2 work). Then this docs commit on `main` (and the same file on `modernization`).
 
 ---
 
@@ -90,22 +90,27 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED (CI green) / VERIFIED
 
 | Commit | Run | build (unit + Robolectric + lint) | API 29 | API 34 |
 |---|---|---|---|---|
-| `47a6c79` fix only | 44222040962 | see Actions | | |
 | `51bf521` fix + fixture tests | 44222596353 | PASSED | PASSED | PASSED |
-| `a0dd4cb` (test-only change vs `51bf521`) | 44222690821 | PASSED | PASSED | FAILED once: `AppFlowsTest.shoppingListIsBuiltFromMenu` waited 15 s for `gen_confirm` (UI timing flake F12, same production code passed in 44222596353). Failed job re-run requested 02:38 UTC |
+| `a0dd4cb` (test-only change vs `51bf521`) | 44222690821 attempt 1 | PASSED | PASSED | FAILED: `AppFlowsTest.shoppingListIsBuiltFromMenu` waited 15 s for `gen_confirm` (UI timing flake F12; same production code passed in 44222596353) |
+| `a0dd4cb` | 44222690821 attempt 2 (re-run of API 34 only) | — | — | NOT RUN: job failed in 3 s without a runner (F13) |
+| `6ae5d81` modernization merge | 44225149576 (push), 44225155544 (PR) | NOT RUN (F13) | skipped | skipped |
+| `4989e62` main merge | 44225182905 | NOT RUN (F13) | skipped | skipped |
+
+The code on `6ae5d81` / `4989e62` equals `a0dd4cb` plus docs (README, handoff, AGENT.md). Last full green run for this production code: 44222596353.
 
 ### PENDING TESTS AND CHECKS
 
 | Check | How to read | Status |
 |---|---|---|
-| Re-run of API 34 job, run 44222690821 attempt 2 | `actions_list list_workflow_jobs 44222690821` | PENDING / RUNNING (do not record as passed until read) |
-| CI on `modernization` and `main` after the merges | `list_workflow_runs` branch `modernization` / `main` | PENDING |
+| CI on `main` `4989e62` (and later docs commits) | `actions_list list_workflow_runs` branch `main`; when runners work again: `actions_run_trigger rerun_workflow_run run_id=44225182905` | PENDING — blocked by F13 |
+| CI on `modernization` `6ae5d81` | rerun 44225149576 | PENDING — blocked by F13 |
 | User device retests UT-23.2, 23.3, 23.4, 23.10 | user | PENDING |
 
 ---
 
 ## F. Blockers and known issues
 
+- **F13 GitHub Actions jobs no longer start (since ~02:38 UTC 2026-11-18):** every new job ends as `failure` within 2-3 s, with no runner, no steps and no log (log download returns 404). This is an account/runner-level problem (typically: Actions minutes or spending limit for private repositories reached, or a billing lock / GitHub outage). Owner: check GitHub -> Settings -> Billing and plans -> Actions usage / spending limit, then re-run the runs in E.
 - **F2 Signing (UT-23.1, Task 8 deferred):** needs a permanent keystore in GitHub Secrets (`HOMEMENU_KEYSTORE_BASE64`, `HOMEMENU_KEYSTORE_PASSWORD`, `HOMEMENU_KEY_ALIAS`, `HOMEMENU_KEY_PASSWORD`); then the workflow decodes it, exports `HOMEMENU_KEYSTORE_FILE` and runs `assembleRelease`. Never generate a replacement key and call it compatible.
 - **F11** Robolectric `android-all` download flake: re-run failed jobs.
 - **F12** `AppFlowsTest.shoppingListIsBuiltFromMenu` can time out on API 34 tablet waiting for `gen_confirm`. Possible hardening: same retry/IME-close helper as F7.
@@ -115,8 +120,9 @@ Statuses: NOT STARTED / IN PROGRESS / IMPLEMENTED / TESTED (CI green) / VERIFIED
 
 ## G. NEXT AGENT — START HERE
 
-1. Read the PENDING runs in E; if the API 34 re-run fails again on F12, harden `AppFlowsTest` (see F7 helper) in a branch from `modernization`.
-2. Latest code: `modernization` == `main` after the final merges of this session (fix `47a6c79` + tests).
-3. Wait for user retest results for UT-23.2/23.3/23.4/23.10 and update the table above.
-4. Task 8 only when the user asks (needs the keystore secrets).
-5. Files to inspect first: `domain/backup/BackupFormat.kt`, `data/files/BackupManager.kt`, `app/src/test/.../data/files/FixtureImportDatabaseTest.kt`.
+1. Check F13. When jobs start again, re-run 44225182905 (main) and 44225149576 (modernization) and record results in E.
+2. If API 34 fails on F12 again, harden `AppFlowsTest` (F7 helper) in a branch from `modernization`.
+3. Latest code: `main` `4989e62` == `modernization` `6ae5d81` (+ this docs commit on both).
+4. Wait for user retest results for UT-23.2/23.3/23.4/23.10 and update the table above.
+5. Task 8 only when the user asks (needs the keystore secrets).
+6. Files to inspect first: `domain/backup/BackupFormat.kt`, `data/files/BackupManager.kt`, `app/src/test/.../data/files/FixtureImportDatabaseTest.kt`.
