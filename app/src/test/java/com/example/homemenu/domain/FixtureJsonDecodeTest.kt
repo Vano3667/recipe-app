@@ -58,7 +58,7 @@ class FixtureJsonDecodeTest {
 
     @Test fun `last recipe keeps its ingredient order`() {
         val r = BackupJson.decode(UserFixture.text()).recipes.last()
-        assertThat(r.id).isEqualTo(140)
+        assertThat(r.id).isEqualTo(140L)
         assertThat(r.name).isEqualTo("Индейка, тушеная в сливках с брокколи")
         assertThat(r.ingredients.map { it.product })
             .containsExactly("филе грудки индейки", "лука", "брокколи", "масла гхи", "соль", "специи по вкусу", "сливок 10%").inOrder()
