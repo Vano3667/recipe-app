@@ -1,0 +1,65 @@
+name: agent-diag
+on:
+  push:
+    branches: [agent-diag]
+  workflow_dispatch: {}
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Analyze fixture
+        run: |
+          git fetch origin main
+          git show origin/main:recipes_from_budget_classic_1500kcal.json > /tmp/f.json
+          ls -l /tmp/f.json
+          head -c 3 /tmp/f.json | xxd
+          python3 - <<'EOF'
+          import json, collections
+          raw = open('/tmp/f.json','rb').read()
+          print('BOM', raw[:3] == b'\xef\xbb\xbf')
+          d = json.loads(raw.decode('utf-8-sig'))
+          def shape(x, depth=0, maxd=6):
+              if depth > maxd: return '...'
+              if isinstance(x, dict):
+                  return {k: shape(v, depth+1) for k, v in list(x.items())[:40]}
+              if isinstance(x, list):
+                  return [len(x), shape(x[0], depth+1) if x else None]
+              return type(x).__name__ + ':' + repr(x)[:60]
+          print('TOP TYPE', type(d).__name__)
+          print(json.dumps(shape(d), ensure_ascii=False, indent=1)[:12000])
+          EOF
+          echo ==== HEAD 6000 ====
+          head -c 6000 /tmp/f.json
+          echo
+          echo ==== TAIL 1500 ====
+          tail -c 1500 /tmp/f.json
+  tree:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tree and divergence
+        run: |
+          git fetch origin main
+          git ls-files | grep -v '^recipes_from' 
+          echo ==== main..HEAD ====
+          git log --oneline origin/main..HEAD | wc -l
+          echo ==== HEAD..main ====
+          git log --oneline HEAD..origin/main
+          echo ==== diff stat main vs HEAD ====
+          git diff --stat origin/main HEAD | tail -80
+          echo ==== merge-base ====
+          git merge-base origin/main HEAD
+  src:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dump import sources
+        run: |
+          for f in $(ls app/src/main/java/com/example/homemenu/domain/backup/*.kt app/src/main/java/com/example/homemenu/data/files/*.kt); do echo "==== FILE $f"; cat -n "$f"; done
+          echo ==== GREP ====
+          grep -rn -i 'json\|importText\|TextImport' app/src/main/java --include=*.kt | grep -v '^app/src/main/java/com/example/homemenu/domain/backup' | head -150
