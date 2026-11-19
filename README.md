@@ -4,8 +4,9 @@
 
 All required Stage 2 tasks have been implemented, excluding Task 8, which was intentionally deferred.
 
-> Status details (2026-11-18): every Stage 2 item except Task 8 is implemented and passed CI (build, unit +
-> Robolectric, lint, emulator tests API 29 / API 34). Manual re-checks on the user's device are still required for
+> Status details (re-verified 2026-11-19): every Stage 2 item except Task 8 is implemented and passed CI on `main`
+> (run 44225182905: build, unit + Robolectric incl. import of `recipes_from_budget_classic_1500kcal.json` into the
+> database, lint, emulator tests API 29 / API 34). Manual re-checks on the user's device are still required for
 > ingredient reordering, the compact theme selector, shopping-list sharing and the JSON import fix. The APK
 > signature mismatch (user check 23.1) was investigated: its cause is the random debug key of each CI runner;
 > a permanent signing key belongs to the deferred Task 8. Full list: `DEVELOPMENT_HANDOFF.md`.
