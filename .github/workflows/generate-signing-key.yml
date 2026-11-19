@@ -1,0 +1,50 @@
+# Task 8, one-time helper. Run it manually (Actions -> "Generate signing key (one time)" -> Run workflow)
+# ONLY if you do not have a release keystore yet. It creates a NEW permanent key; it is not, and cannot be,
+# the key of APKs built before (those were signed with random debug keys).
+# The key is returned only as a short-lived artifact; nothing secret is printed to the log or committed.
+# After saving the files: add the 4 GitHub Secrets, keep the .jks + password in a safe place (password manager,
+# offline copy) and delete the artifact. Losing the key means future APKs can never update the installed app.
+name: Generate signing key (one time)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  keygen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Generate keystore
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p out
+          PASS=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut -c1-32)
+          keytool -genkeypair -keystore out/homemenu-release.jks -storetype PKCS12 \
+            -alias homemenu -keyalg RSA -keysize 4096 -validity 36500 \
+            -storepass "$PASS" -keypass "$PASS" -dname "CN=Home Menu" >/dev/null 2>&1
+          base64 -w0 out/homemenu-release.jks > out/HOMEMENU_KEYSTORE_BASE64.txt
+          printf '%s' "$PASS" > out/HOMEMENU_KEYSTORE_PASSWORD.txt
+          printf '%s' "$PASS" > out/HOMEMENU_KEY_PASSWORD.txt
+          printf 'homemenu' > out/HOMEMENU_KEY_ALIAS.txt
+          keytool -list -v -keystore out/homemenu-release.jks -storepass "$PASS" | grep -E 'SHA256:' > out/certificate-sha256.txt
+          cat > out/README.txt <<'EOF'
+          Home Menu release signing key.
+          1. GitHub -> repository Settings -> Secrets and variables -> Actions -> New repository secret.
+             Create 4 secrets; each value is the full content of the file with the same name:
+             HOMEMENU_KEYSTORE_BASE64, HOMEMENU_KEYSTORE_PASSWORD, HOMEMENU_KEY_ALIAS, HOMEMENU_KEY_PASSWORD.
+          2. Keep homemenu-release.jks and the password in a safe place outside GitHub.
+          3. Delete this artifact in the Actions run page.
+          EOF
+          echo "Certificate fingerprint (public, safe to show):"
+          cat out/certificate-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signing-key-SAVE-THEN-DELETE
+          path: out/
+          retention-days: 3
+          if-no-files-found: error
