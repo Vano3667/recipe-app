@@ -12,6 +12,13 @@ plugins {
 // Build date shown in Settings > «О приложении». UTC, so every machine produces the same format.
 val buildDate: String = LocalDate.now(ZoneOffset.UTC).toString()
 
+// Task 8: versionCode must grow with every APK given to the user, otherwise Android refuses the update as a
+// downgrade. CI passes its run number (HOMEMENU_VERSION_CODE = github.run_number, always increasing);
+// a local build without the variable uses MIN_VERSION_CODE. 2 was the last hard-coded value (app 1.1.0).
+val minVersionCode = 3
+val appVersionCode: Int = System.getenv("HOMEMENU_VERSION_CODE")?.trim()?.toIntOrNull()
+    ?.coerceAtLeast(minVersionCode) ?: minVersionCode
+
 android {
     namespace = "com.example.homemenu"
     compileSdk = 34
@@ -21,9 +28,8 @@ android {
         applicationId = "com.example.homemenu"
         minSdk = 29
         targetSdk = 34
-        // Increase versionCode by 1 for every APK given to the user.
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = appVersionCode
+        versionName = "1.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
         resourceConfigurations += listOf("ru")
