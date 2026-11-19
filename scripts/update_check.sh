@@ -28,7 +28,11 @@ launch() {
   sleep 3
 }
 
-pkg_field() { adb shell dumpsys package "$PKG" | grep -m1 "$1" | tr -d '\r' | sed 's/^ *//'; }
+# dumpsys goes to a file first: `grep -m1` on a pipe would end it early and, with pipefail, abort the script.
+pkg_field() {
+  adb shell dumpsys package "$PKG" > "$WORK/dumpsys.txt"
+  grep -m1 "$1" "$WORK/dumpsys.txt" | tr -d '\r' | sed 's/^ *//' || true
+}
 
 fingerprint() {
   local dir="$WORK/$1"
@@ -52,7 +56,7 @@ BEFORE=$(fingerprint before)
 CODE_BEFORE=$(pkg_field versionCode=)
 FIRST_BEFORE=$(pkg_field firstInstallTime=)
 log "before: $BEFORE | $CODE_BEFORE | $FIRST_BEFORE"
-case "$BEFORE" in recipes=0*) log "FAIL: the old app stored no recipes"; exit 1 ;; esac
+case "$BEFORE" in recipes=0\ *) log "FAIL: the old app stored no recipes"; exit 1 ;; esac
 
 log "install NEW over OLD (adb install -r)"
 adb install -r "$NEW"
@@ -64,7 +68,7 @@ log "after:  $AFTER | $CODE_AFTER | $FIRST_AFTER"
 
 fail=0
 [ "$BEFORE" = "$AFTER" ] || { log "FAIL: stored recipes changed during the update"; fail=1; }
-[ "$FIRST_BEFORE" = "$FIRST_AFTER" ] || { log "FAIL: firstInstallTime changed (app was reinstalled, not updated)"; fail=1; }
+[ -n "$FIRST_BEFORE" ] && [ "$FIRST_BEFORE" = "$FIRST_AFTER" ] || { log "FAIL: firstInstallTime changed (app was reinstalled, not updated)"; fail=1; }
 [ "$CODE_BEFORE" != "$CODE_AFTER" ] || { log "FAIL: versionCode did not change"; fail=1; }
-[ "$fail" = 0 ] && log "PASSED: update installed over the existing app, data preserved"
+if [ "$fail" = 0 ]; then log "PASSED: update installed over the existing app, data preserved"; fi
 exit "$fail"
