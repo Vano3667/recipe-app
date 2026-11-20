@@ -1,0 +1,66 @@
+name: Build signed Home Menu APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Download fonts
+        run: bash scripts/fetch_fonts.sh
+
+      - name: Build and verify signed APK
+        shell: bash
+        env:
+          HOMEMENU_KEYSTORE_BASE64: ${{ secrets.HOMEMENU_KEYSTORE_BASE64 }}
+          HOMEMENU_KEYSTORE_PASSWORD: ${{ secrets.HOMEMENU_KEYSTORE_PASSWORD }}
+          HOMEMENU_KEY_ALIAS: ${{ secrets.HOMEMENU_KEY_ALIAS }}
+          HOMEMENU_KEY_PASSWORD: ${{ secrets.HOMEMENU_KEY_PASSWORD }}
+        run: |
+          : "${HOMEMENU_KEYSTORE_BASE64:?Missing HOMEMENU_KEYSTORE_BASE64 secret}"
+          : "${HOMEMENU_KEYSTORE_PASSWORD:?Missing HOMEMENU_KEYSTORE_PASSWORD secret}"
+          : "${HOMEMENU_KEY_ALIAS:?Missing HOMEMENU_KEY_ALIAS secret}"
+          : "${HOMEMENU_KEY_PASSWORD:?Missing HOMEMENU_KEY_PASSWORD secret}"
+
+          umask 077
+          HOMEMENU_KEYSTORE_FILE="$(mktemp "$RUNNER_TEMP/homemenu.XXXXXXXX.jks")"
+          trap 'rm -f -- "$HOMEMENU_KEYSTORE_FILE"' EXIT
+          printf '%s' "$HOMEMENU_KEYSTORE_BASE64" | base64 --decode > "$HOMEMENU_KEYSTORE_FILE"
+          unset HOMEMENU_KEYSTORE_BASE64
+          export HOMEMENU_KEYSTORE_FILE
+
+          gradle --no-daemon :app:assembleRelease
+          apk="app/build/outputs/apk/release/app-release.apk"
+          shopt -s nullglob
+          apksigners=("$ANDROID_HOME"/build-tools/*/apksigner)
+          if (( ${#apksigners[@]} == 0 )); then
+            echo 'Android SDK Build Tools with apksigner are required.' >&2
+            exit 1
+          fi
+          "${apksigners[-1]}" verify "$apk"
+
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-menu-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
